@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Save, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, Eye, FileText } from 'lucide-react';
 
 function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, updateStock, assets, currency, inventoryMethod }) {
   const [isCreating, setIsCreating] = useState(false);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, TrendingUp, Truck } from 'lucide-react';
 
 function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency }) {
   const [isAdding, setIsAdding] = useState(false);
