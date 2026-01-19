@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Package, FileText, Truck, DollarSign, Settings, Home as HomeIcon, Building2, LogOut } from 'lucide-react';
 import Home from './Home';
 import Stock from './Stock';

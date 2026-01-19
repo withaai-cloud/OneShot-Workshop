@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Search, ChevronDown, ChevronUp, History, FileText } from 'lucide-react';
+import { Plus, Trash2, Search, ChevronDown, ChevronUp, History, FileText } from 'lucide-react';
 import PurchaseInvoice from './PurchaseInvoice';
 
 function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers }) {
