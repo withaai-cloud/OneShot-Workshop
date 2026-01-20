@@ -1,183 +1,278 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
+import { supabase } from './lib/supabase';
+import * as api from './lib/api';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Data state
   const [stock, setStock] = useState([]);
   const [jobCards, setJobCards] = useState([]);
   const [assets, setAssets] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [currency, setCurrency] = useState('ZAR');
   const [inventoryMethod, setInventoryMethod] = useState('FIFO');
-  const [nextStockId, setNextStockId] = useState(1);
-  const [nextJobCardId, setNextJobCardId] = useState(1);
-  const [nextAssetId, setNextAssetId] = useState(1);
-  const [nextSupplierId, setNextSupplierId] = useState(1);
 
-  // Check for logged in user on mount
-  useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
+  // Load all user data from Supabase
+  const loadUserData = useCallback(async (userId) => {
+    setDataLoading(true);
+    setError(null);
+    try {
+      const data = await api.loadAllUserData(userId);
+
+      setStock(data.stock || []);
+      setJobCards(data.jobCards || []);
+      setAssets(data.assets || []);
+      setSuppliers(data.suppliers || []);
+      setCurrency(data.settings?.currency || 'ZAR');
+      setInventoryMethod(data.settings?.inventory_method || 'FIFO');
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      setError('Failed to load data. Please refresh the page.');
+    } finally {
+      setDataLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
-  // Load data from localStorage on mount
+  // Check for existing session on mount
   useEffect(() => {
-    const savedStock = localStorage.getItem('workshopStock');
-    const savedJobCards = localStorage.getItem('workshopJobCards');
-    const savedAssets = localStorage.getItem('workshopAssets');
-    const savedSuppliers = localStorage.getItem('workshopSuppliers');
-    const savedCurrency = localStorage.getItem('workshopCurrency');
-    const savedInventoryMethod = localStorage.getItem('workshopInventoryMethod');
-    const savedNextStockId = localStorage.getItem('nextStockId');
-    const savedNextJobCardId = localStorage.getItem('nextJobCardId');
-    const savedNextAssetId = localStorage.getItem('nextAssetId');
-    const savedNextSupplierId = localStorage.getItem('nextSupplierId');
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-    if (savedStock) setStock(JSON.parse(savedStock));
-    if (savedJobCards) setJobCards(JSON.parse(savedJobCards));
-    if (savedAssets) setAssets(JSON.parse(savedAssets));
-    if (savedSuppliers) setSuppliers(JSON.parse(savedSuppliers));
-    if (savedCurrency) setCurrency(savedCurrency);
-    if (savedInventoryMethod) setInventoryMethod(savedInventoryMethod);
-    if (savedNextStockId) setNextStockId(parseInt(savedNextStockId));
-    if (savedNextJobCardId) setNextJobCardId(parseInt(savedNextJobCardId));
-    if (savedNextAssetId) setNextAssetId(parseInt(savedNextAssetId));
-    if (savedNextSupplierId) setNextSupplierId(parseInt(savedNextSupplierId));
-  }, []);
+        if (session?.user) {
+          setCurrentUser(session.user);
+          await loadUserData(session.user.id);
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  // Save data to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('workshopStock', JSON.stringify(stock));
-  }, [stock]);
+    initAuth();
 
-  useEffect(() => {
-    localStorage.setItem('workshopJobCards', JSON.stringify(jobCards));
-  }, [jobCards]);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setCurrentUser(session.user);
+        await loadUserData(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setStock([]);
+        setJobCards([]);
+        setAssets([]);
+        setSuppliers([]);
+        setCurrency('ZAR');
+        setInventoryMethod('FIFO');
+      }
+    });
 
-  useEffect(() => {
-    localStorage.setItem('workshopAssets', JSON.stringify(assets));
-  }, [assets]);
-
-  useEffect(() => {
-    localStorage.setItem('workshopSuppliers', JSON.stringify(suppliers));
-  }, [suppliers]);
-
-  useEffect(() => {
-    localStorage.setItem('workshopCurrency', currency);
-  }, [currency]);
-
-  useEffect(() => {
-    localStorage.setItem('workshopInventoryMethod', inventoryMethod);
-  }, [inventoryMethod]);
-
-  useEffect(() => {
-    localStorage.setItem('nextStockId', nextStockId.toString());
-  }, [nextStockId]);
-
-  useEffect(() => {
-    localStorage.setItem('nextJobCardId', nextJobCardId.toString());
-  }, [nextJobCardId]);
-
-  useEffect(() => {
-    localStorage.setItem('nextAssetId', nextAssetId.toString());
-  }, [nextAssetId]);
-
-  useEffect(() => {
-    localStorage.setItem('nextSupplierId', nextSupplierId.toString());
-  }, [nextSupplierId]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [loadUserData]);
 
   // Auth functions
-  const handleLogin = (user) => {
+  const handleLogin = async (user) => {
     setCurrentUser(user);
+    await loadUserData(user.id);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
+  const handleLogout = async () => {
+    try {
+      await api.signOut();
+      setCurrentUser(null);
+      setStock([]);
+      setJobCards([]);
+      setAssets([]);
+      setSuppliers([]);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
   // Stock functions
-  const addStock = (item) => {
-    const newItem = { ...item, id: nextStockId };
-    setStock([...stock, newItem]);
-    setNextStockId(nextStockId + 1);
+  const addStock = async (item) => {
+    try {
+      const newItem = await api.addStock(currentUser.id, item);
+      setStock(prev => [...prev, { ...newItem, batches: item.batches || [], usageHistory: [] }]);
+      return newItem;
+    } catch (err) {
+      console.error('Error adding stock:', err);
+      throw err;
+    }
   };
 
-  const updateStock = (id, updatedItem) => {
-    setStock(stock.map(item => item.id === id ? { ...updatedItem, id } : item));
+  const updateStock = async (id, updatedItem) => {
+    try {
+      await api.updateStock(id, updatedItem);
+      setStock(prev => prev.map(item => item.id === id ? { ...updatedItem, id } : item));
+    } catch (err) {
+      console.error('Error updating stock:', err);
+      throw err;
+    }
   };
 
-  const deleteStock = (id) => {
-    setStock(stock.filter(item => item.id !== id));
+  const deleteStock = async (id) => {
+    try {
+      await api.deleteStock(id);
+      setStock(prev => prev.filter(item => item.id !== id));
+    } catch (err) {
+      console.error('Error deleting stock:', err);
+      throw err;
+    }
   };
 
   // Job Card functions
-  const addJobCard = (jobCard) => {
-    const newJobCard = { ...jobCard, id: nextJobCardId };
-    setJobCards([...jobCards, newJobCard]);
-    setNextJobCardId(nextJobCardId + 1);
-    return newJobCard;
-  };
-
-  const updateJobCard = (id, updatedJobCard) => {
-    setJobCards(jobCards.map(jc => jc.id === id ? { ...updatedJobCard, id } : jc));
-  };
-
-  const deleteJobCard = (id) => {
-    const jobCard = jobCards.find(jc => jc.id === id);
-    if (jobCard && jobCard.status === 'completed' && jobCard.items) {
-      jobCard.items.forEach(item => {
-        const stockItem = stock.find(s => s.id === item.stockId);
-        if (stockItem) {
-          updateStock(stockItem.id, {
-            ...stockItem,
-            quantity: stockItem.quantity + item.quantity
-          });
-        }
-      });
+  const addJobCard = async (jobCard) => {
+    try {
+      const newJobCard = await api.addJobCard(currentUser.id, jobCard);
+      setJobCards(prev => [newJobCard, ...prev]);
+      return newJobCard;
+    } catch (err) {
+      console.error('Error adding job card:', err);
+      throw err;
     }
-    setJobCards(jobCards.filter(jc => jc.id !== id));
+  };
+
+  const updateJobCard = async (id, updatedJobCard) => {
+    try {
+      const updated = await api.updateJobCard(id, updatedJobCard);
+      setJobCards(prev => prev.map(jc => jc.id === id ? updated : jc));
+      return updated;
+    } catch (err) {
+      console.error('Error updating job card:', err);
+      throw err;
+    }
+  };
+
+  const deleteJobCard = async (id) => {
+    try {
+      // Get the job card to check if we need to restore stock
+      const jobCard = jobCards.find(jc => jc.id === id);
+
+      await api.deleteJobCard(id);
+      setJobCards(prev => prev.filter(jc => jc.id !== id));
+
+      // If the job card was completed, we might need to restore stock quantities
+      // This would be handled by the backend or a separate function
+      if (jobCard && jobCard.status === 'completed' && jobCard.items) {
+        // Reload stock to get updated quantities
+        const updatedStock = await api.getStock(currentUser.id);
+        setStock(updatedStock);
+      }
+    } catch (err) {
+      console.error('Error deleting job card:', err);
+      throw err;
+    }
   };
 
   // Asset functions
-  const addAsset = (asset) => {
-    const newAsset = { ...asset, id: nextAssetId };
-    setAssets([...assets, newAsset]);
-    setNextAssetId(nextAssetId + 1);
+  const addAsset = async (asset) => {
+    try {
+      const newAsset = await api.addAsset(currentUser.id, asset);
+      setAssets(prev => [...prev, newAsset]);
+      return newAsset;
+    } catch (err) {
+      console.error('Error adding asset:', err);
+      throw err;
+    }
   };
 
-  const updateAsset = (id, updatedAsset) => {
-    setAssets(assets.map(asset => asset.id === id ? { ...updatedAsset, id } : asset));
+  const updateAsset = async (id, updatedAsset) => {
+    try {
+      const updated = await api.updateAsset(id, updatedAsset);
+      setAssets(prev => prev.map(asset => asset.id === id ? updated : asset));
+      return updated;
+    } catch (err) {
+      console.error('Error updating asset:', err);
+      throw err;
+    }
   };
 
-  const deleteAsset = (id) => {
-    setAssets(assets.filter(asset => asset.id !== id));
+  const deleteAsset = async (id) => {
+    try {
+      await api.deleteAsset(id);
+      setAssets(prev => prev.filter(asset => asset.id !== id));
+    } catch (err) {
+      console.error('Error deleting asset:', err);
+      throw err;
+    }
   };
 
   // Supplier functions
-  const addSupplier = (supplier) => {
-    const newSupplier = { ...supplier, id: nextSupplierId };
-    setSuppliers([...suppliers, newSupplier]);
-    setNextSupplierId(nextSupplierId + 1);
+  const addSupplier = async (supplier) => {
+    try {
+      const newSupplier = await api.addSupplier(currentUser.id, supplier);
+      setSuppliers(prev => [...prev, newSupplier]);
+      return newSupplier;
+    } catch (err) {
+      console.error('Error adding supplier:', err);
+      throw err;
+    }
   };
 
-  const updateSupplier = (id, updatedSupplier) => {
-    setSuppliers(suppliers.map(supplier => supplier.id === id ? { ...updatedSupplier, id } : supplier));
+  const updateSupplier = async (id, updatedSupplier) => {
+    try {
+      const updated = await api.updateSupplier(id, updatedSupplier);
+      setSuppliers(prev => prev.map(supplier => supplier.id === id ? updated : supplier));
+      return updated;
+    } catch (err) {
+      console.error('Error updating supplier:', err);
+      throw err;
+    }
   };
 
-  const deleteSupplier = (id) => {
-    setStock(stock.map(item => 
-      item.supplierId === id ? { ...item, supplierId: null } : item
-    ));
-    setSuppliers(suppliers.filter(supplier => supplier.id !== id));
+  const deleteSupplier = async (id) => {
+    try {
+      await api.deleteSupplier(id);
+      setSuppliers(prev => prev.filter(supplier => supplier.id !== id));
+      // Update stock items that referenced this supplier
+      setStock(prev => prev.map(item =>
+        item.supplierId === id ? { ...item, supplierId: null } : item
+      ));
+    } catch (err) {
+      console.error('Error deleting supplier:', err);
+      throw err;
+    }
+  };
+
+  // Settings functions
+  const handleSetCurrency = async (newCurrency) => {
+    try {
+      await api.updateSettings(currentUser.id, { currency: newCurrency, inventory_method: inventoryMethod });
+      setCurrency(newCurrency);
+    } catch (err) {
+      console.error('Error updating currency:', err);
+      throw err;
+    }
+  };
+
+  const handleSetInventoryMethod = async (newMethod) => {
+    try {
+      await api.updateSettings(currentUser.id, { currency, inventory_method: newMethod });
+      setInventoryMethod(newMethod);
+    } catch (err) {
+      console.error('Error updating inventory method:', err);
+      throw err;
+    }
+  };
+
+  // Refresh data function (for manual refresh)
+  const refreshData = async () => {
+    if (currentUser) {
+      await loadUserData(currentUser.id);
+    }
   };
 
   if (isLoading) {
@@ -192,6 +287,12 @@ function App() {
   return (
     <Router>
       <div className="App">
+        {error && (
+          <div className="global-error">
+            {error}
+            <button onClick={() => setError(null)}>Dismiss</button>
+          </div>
+        )}
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={
@@ -200,7 +301,7 @@ function App() {
           <Route path="/register" element={
             currentUser ? <Navigate to="/dashboard" /> : <Register onLogin={handleLogin} />
           } />
-          
+
           {/* Protected routes */}
           <Route path="/dashboard/*" element={
             currentUser ? (
@@ -222,17 +323,19 @@ function App() {
                 updateSupplier={updateSupplier}
                 deleteSupplier={deleteSupplier}
                 currency={currency}
-                setCurrency={setCurrency}
+                setCurrency={handleSetCurrency}
                 inventoryMethod={inventoryMethod}
-                setInventoryMethod={setInventoryMethod}
+                setInventoryMethod={handleSetInventoryMethod}
                 currentUser={currentUser}
                 onLogout={handleLogout}
+                refreshData={refreshData}
+                dataLoading={dataLoading}
               />
             ) : (
               <Navigate to="/login" />
             )
           } />
-          
+
           {/* Redirect root to login or dashboard */}
           <Route path="/" element={
             <Navigate to={currentUser ? "/dashboard" : "/login"} />

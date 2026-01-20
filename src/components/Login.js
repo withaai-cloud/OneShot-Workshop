@@ -1,40 +1,42 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, Loader } from 'lucide-react';
+import { signIn } from '../lib/api';
 
 function Login({ onLogin }) {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    // Get stored users
-    const users = JSON.parse(localStorage.getItem('workshopUsers') || '[]');
-    
-    // Find user
-    const user = users.find(u => u.email === formData.email);
-    
-    if (!user) {
-      setError('Email not found. Please register first.');
-      return;
+    try {
+      const { user, session } = await signIn(formData.email, formData.password);
+
+      if (user && session) {
+        onLogin(user);
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      if (err.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please try again.');
+      } else if (err.message.includes('Email not confirmed')) {
+        setError('Please check your email and confirm your account before logging in.');
+      } else {
+        setError(err.message || 'An error occurred during login. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
     }
-    
-    if (user.password !== formData.password) {
-      setError('Incorrect password. Please try again.');
-      return;
-    }
-    
-    // Set current user
-    localStorage.setItem('currentUser', JSON.stringify(user));
-    onLogin(user);
-    navigate('/dashboard');
   };
 
   return (
@@ -66,6 +68,7 @@ function Login({ onLogin }) {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -80,24 +83,32 @@ function Login({ onLogin }) {
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
+                disabled={isLoading}
               />
               <button
                 type="button"
                 className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
           </div>
 
-          <button type="submit" className="auth-submit-btn">
-            Sign In
+          <button type="submit" className="auth-submit-btn" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader size={20} className="spinner" /> Signing In...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </button>
         </form>
 
         <div className="auth-footer">
-          <p>Don't have an account? <button onClick={() => navigate('/register')} className="auth-link">Register here</button></p>
+          <p>Don't have an account? <button onClick={() => navigate('/register')} className="auth-link" disabled={isLoading}>Register here</button></p>
         </div>
       </div>
     </div>

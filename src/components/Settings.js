@@ -1,7 +1,12 @@
-import React from 'react';
-import { Globe, Info, Package } from 'lucide-react';
+import React, { useState } from 'react';
+import { Globe, Info, Package, Loader } from 'lucide-react';
+import * as api from '../lib/api';
 
-function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }) {
+function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, currentUser }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
   const currencies = [
     { code: 'ZAR', name: 'South African Rand (R)', symbol: 'R' },
     { code: 'USD', name: 'US Dollar ($)', symbol: '$' },
@@ -9,70 +14,97 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
     { code: 'GBP', name: 'British Pound (£)', symbol: '£' }
   ];
 
-  const handleCurrencyChange = (e) => {
-    setCurrency(e.target.value);
-  };
-
-  const handleInventoryMethodChange = (e) => {
-    if (window.confirm('Changing the inventory method will affect how costs are calculated on future job cards. Continue?')) {
-      setInventoryMethod(e.target.value);
+  const handleCurrencyChange = async (e) => {
+    const newCurrency = e.target.value;
+    setIsLoading(true);
+    setError('');
+    try {
+      await setCurrency(newCurrency);
+      setSuccess('Currency updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to update currency. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const clearAllData = () => {
-    if (window.confirm('Are you sure you want to clear all data? This action cannot be undone!')) {
-      if (window.confirm('This will delete all stock, job cards, and assets. Are you absolutely sure?')) {
-        localStorage.clear();
-        window.location.reload();
+  const handleInventoryMethodChange = async (e) => {
+    const newMethod = e.target.value;
+    if (window.confirm('Changing the inventory method will affect how costs are calculated on future job cards. Continue?')) {
+      setIsLoading(true);
+      setError('');
+      try {
+        await setInventoryMethod(newMethod);
+        setSuccess('Inventory method updated successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+      } catch (err) {
+        setError('Failed to update inventory method. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     }
   };
 
-  const exportData = () => {
-    const data = {
-      stock: localStorage.getItem('workshopStock'),
-      jobCards: localStorage.getItem('workshopJobCards'),
-      assets: localStorage.getItem('workshopAssets'),
-      suppliers: localStorage.getItem('workshopSuppliers'),
-      currency: localStorage.getItem('workshopCurrency'),
-      inventoryMethod: localStorage.getItem('workshopInventoryMethod'),
-      exportDate: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `workshop-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const clearAllData = async () => {
+    if (window.confirm('Are you sure you want to clear all data? This action cannot be undone!')) {
+      if (window.confirm('This will delete all stock, job cards, assets, and suppliers. Are you absolutely sure?')) {
+        setIsLoading(true);
+        setError('');
+        try {
+          await api.clearAllUserData(currentUser.id);
+          setSuccess('All data cleared successfully! The page will now reload.');
+          setTimeout(() => window.location.reload(), 1500);
+        } catch (err) {
+          setError('Failed to clear data. Please try again.');
+          setIsLoading(false);
+        }
+      }
+    }
   };
 
-  const importData = (e) => {
+  const exportData = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const data = await api.exportUserData(currentUser.id);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `workshop-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setSuccess('Data exported successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to export data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const importData = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const data = JSON.parse(event.target.result);
-        
         if (window.confirm('This will replace all current data. Continue?')) {
-          if (data.stock) localStorage.setItem('workshopStock', data.stock);
-          if (data.jobCards) localStorage.setItem('workshopJobCards', data.jobCards);
-          if (data.assets) localStorage.setItem('workshopAssets', data.assets);
-          if (data.suppliers) localStorage.setItem('workshopSuppliers', data.suppliers);
-          if (data.currency) localStorage.setItem('workshopCurrency', data.currency);
-          if (data.inventoryMethod) localStorage.setItem('workshopInventoryMethod', data.inventoryMethod);
-          
-          alert('Data imported successfully! The page will now reload.');
-          window.location.reload();
+          setIsLoading(true);
+          setError('');
+          await api.importUserData(currentUser.id, event.target.result);
+          setSuccess('Data imported successfully! The page will now reload.');
+          setTimeout(() => window.location.reload(), 1500);
         }
-      } catch (error) {
-        alert('Error importing data. Please check the file format.');
+      } catch (err) {
+        setError('Error importing data. Please check the file format.');
+        setIsLoading(false);
       }
     };
     reader.readAsText(file);
+    e.target.value = ''; // Reset input
   };
 
   return (
@@ -80,6 +112,18 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
       <div className="page-header">
         <h2>Settings</h2>
       </div>
+
+      {error && (
+        <div className="auth-error" style={{ marginBottom: '1rem' }}>
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="auth-success" style={{ marginBottom: '1rem' }}>
+          {success}
+        </div>
+      )}
 
       <div className="settings-container">
         <div className="settings-section">
@@ -89,7 +133,12 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
           </div>
           <div className="form-group">
             <label>Select Currency</label>
-            <select value={currency} onChange={handleCurrencyChange} className="currency-select">
+            <select
+              value={currency}
+              onChange={handleCurrencyChange}
+              className="currency-select"
+              disabled={isLoading}
+            >
               {currencies.map(curr => (
                 <option key={curr.code} value={curr.code}>
                   {curr.name}
@@ -109,7 +158,12 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
           </div>
           <div className="form-group">
             <label>Costing Method</label>
-            <select value={inventoryMethod} onChange={handleInventoryMethodChange} className="currency-select">
+            <select
+              value={inventoryMethod}
+              onChange={handleInventoryMethodChange}
+              className="currency-select"
+              disabled={isLoading}
+            >
               <option value="FIFO">FIFO (First In, First Out)</option>
               <option value="WEIGHTED_AVERAGE">Weighted Average</option>
             </select>
@@ -123,8 +177,8 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
               <h4>Current Method: {inventoryMethod === 'FIFO' ? 'FIFO (First In, First Out)' : 'Weighted Average'}</h4>
               {inventoryMethod === 'FIFO' ? (
                 <p>
-                  When stock is used, the system will deduct from the oldest purchases first. 
-                  This method matches the actual physical flow of goods and is commonly used for 
+                  When stock is used, the system will deduct from the oldest purchases first.
+                  This method matches the actual physical flow of goods and is commonly used for
                   perishable items or when older stock should be used first.
                 </p>
               ) : (
@@ -142,15 +196,19 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
             <Info size={24} />
             <h3>Data Management</h3>
           </div>
-          
+
           <div className="data-management-actions">
             <div className="action-item">
               <div>
                 <h4>Export Data</h4>
                 <p>Download a backup of all your workshop data as JSON file.</p>
               </div>
-              <button className="btn btn-secondary" onClick={exportData}>
-                Export Backup
+              <button
+                className="btn btn-secondary"
+                onClick={exportData}
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader size={16} className="spinner" /> : 'Export Backup'}
               </button>
             </div>
 
@@ -159,7 +217,10 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
                 <h4>Import Data</h4>
                 <p>Restore data from a previously exported backup file.</p>
               </div>
-              <label className="btn btn-secondary" htmlFor="import-file">
+              <label
+                className={`btn btn-secondary ${isLoading ? 'disabled' : ''}`}
+                htmlFor="import-file"
+              >
                 Import Backup
               </label>
               <input
@@ -168,16 +229,21 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
                 accept=".json"
                 onChange={importData}
                 style={{ display: 'none' }}
+                disabled={isLoading}
               />
             </div>
 
             <div className="action-item danger-zone">
               <div>
                 <h4>Clear All Data</h4>
-                <p>Permanently delete all stock, job cards, and assets. This cannot be undone!</p>
+                <p>Permanently delete all stock, job cards, assets, and suppliers. This cannot be undone!</p>
               </div>
-              <button className="btn btn-danger" onClick={clearAllData}>
-                Clear All Data
+              <button
+                className="btn btn-danger"
+                onClick={clearAllData}
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader size={16} className="spinner" /> : 'Clear All Data'}
               </button>
             </div>
           </div>
@@ -188,7 +254,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
             <h3>About</h3>
           </div>
           <div className="about-info">
-            <h4>OneShot Workshop Manager v2.0</h4>
+            <h4>OneShot Workshop Manager v2.1</h4>
             <p>
               A comprehensive web application for managing workshop expenses, stock inventory, and asset maintenance tracking for OneShot Workshop.
             </p>
@@ -203,10 +269,12 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod }
               <li>Supplier management</li>
               <li>Comprehensive reporting and analytics</li>
               <li>Multi-currency support</li>
+              <li>Cloud-based data storage with Supabase</li>
+              <li>Secure user authentication</li>
               <li>Data export and backup capabilities</li>
             </ul>
             <p className="helper-text">
-              All data is stored locally in your browser. Make sure to export backups regularly.
+              Your data is securely stored in the cloud. You can access it from any device by logging in with your account.
             </p>
           </div>
         </div>

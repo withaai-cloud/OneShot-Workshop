@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Package, FileText, Truck, DollarSign, Settings, Home as HomeIcon, Building2, LogOut } from 'lucide-react';
+import { Package, FileText, Truck, DollarSign, Settings, Home as HomeIcon, Building2, LogOut, RefreshCw } from 'lucide-react';
 import Home from './Home';
 import Stock from './Stock';
 import JobCards from './JobCards';
@@ -9,7 +9,7 @@ import Suppliers from './Suppliers';
 import Reports from './Reports';
 import SettingsPage from './Settings';
 
-function Dashboard({ 
+function Dashboard({
   stock, addStock, updateStock, deleteStock,
   jobCards, addJobCard, updateJobCard, deleteJobCard,
   assets, addAsset, updateAsset, deleteAsset,
@@ -17,19 +17,32 @@ function Dashboard({
   currency, setCurrency,
   inventoryMethod, setInventoryMethod,
   currentUser,
-  onLogout
+  onLogout,
+  refreshData,
+  dataLoading
 }) {
-  
+
   return (
     <div className="dashboard-container">
-      <Navigation currentUser={currentUser} onLogout={onLogout} />
+      <Navigation
+        currentUser={currentUser}
+        onLogout={onLogout}
+        refreshData={refreshData}
+        dataLoading={dataLoading}
+      />
       <main className="main-content">
+        {dataLoading && (
+          <div className="data-loading-overlay">
+            <RefreshCw size={24} className="spinner" />
+            <span>Loading data...</span>
+          </div>
+        )}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/stock" element={
-            <Stock 
-              stock={stock} 
-              addStock={addStock} 
+            <Stock
+              stock={stock}
+              addStock={addStock}
               updateStock={updateStock}
               deleteStock={deleteStock}
               currency={currency}
@@ -37,7 +50,7 @@ function Dashboard({
             />
           } />
           <Route path="/job-cards" element={
-            <JobCards 
+            <JobCards
               jobCards={jobCards}
               addJobCard={addJobCard}
               updateJobCard={updateJobCard}
@@ -50,7 +63,7 @@ function Dashboard({
             />
           } />
           <Route path="/assets" element={
-            <Assets 
+            <Assets
               assets={assets}
               addAsset={addAsset}
               updateAsset={updateAsset}
@@ -60,7 +73,7 @@ function Dashboard({
             />
           } />
           <Route path="/suppliers" element={
-            <Suppliers 
+            <Suppliers
               suppliers={suppliers}
               addSupplier={addSupplier}
               updateSupplier={updateSupplier}
@@ -70,7 +83,7 @@ function Dashboard({
             />
           } />
           <Route path="/reports" element={
-            <Reports 
+            <Reports
               stock={stock}
               jobCards={jobCards}
               assets={assets}
@@ -78,11 +91,12 @@ function Dashboard({
             />
           } />
           <Route path="/settings" element={
-            <SettingsPage 
+            <SettingsPage
               currency={currency}
               setCurrency={setCurrency}
               inventoryMethod={inventoryMethod}
               setInventoryMethod={setInventoryMethod}
+              currentUser={currentUser}
             />
           } />
         </Routes>
@@ -91,9 +105,13 @@ function Dashboard({
   );
 }
 
-function Navigation({ currentUser, onLogout }) {
+function Navigation({ currentUser, onLogout, refreshData, dataLoading }) {
   const location = useLocation();
-  
+
+  // Get user display info from Supabase user metadata
+  const userName = currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || 'User';
+  const workshopName = currentUser?.user_metadata?.workshop_name || 'Workshop';
+
   const navItems = [
     { path: '/dashboard', icon: HomeIcon, label: 'Home' },
     { path: '/dashboard/stock', icon: Package, label: 'Stock' },
@@ -107,13 +125,13 @@ function Navigation({ currentUser, onLogout }) {
   return (
     <nav className="navigation">
       <div className="nav-header">
-        <img src="/header.png" alt="OneShot Workshop" className="nav-logo" />
+        <img src={process.env.PUBLIC_URL + "/header.png"} alt="OneShot Workshop" className="nav-logo" />
       </div>
       <ul className="nav-list">
         {navItems.map(item => (
           <li key={item.path}>
-            <Link 
-              to={item.path} 
+            <Link
+              to={item.path}
               className={location.pathname === item.path ? 'active' : ''}
             >
               <item.icon size={20} />
@@ -123,13 +141,23 @@ function Navigation({ currentUser, onLogout }) {
         ))}
       </ul>
       <div className="nav-footer">
+        {refreshData && (
+          <button
+            className="refresh-btn"
+            onClick={refreshData}
+            disabled={dataLoading}
+            title="Refresh data"
+          >
+            <RefreshCw size={18} className={dataLoading ? 'spinner' : ''} />
+          </button>
+        )}
         <div className="user-info">
           <div className="user-avatar">
-            {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
+            {userName.charAt(0).toUpperCase()}
           </div>
           <div className="user-details">
-            <p className="user-name">{currentUser?.name || 'User'}</p>
-            <p className="user-workshop">{currentUser?.workshopName || 'Workshop'}</p>
+            <p className="user-name">{userName}</p>
+            <p className="user-workshop">{workshopName}</p>
           </div>
         </div>
         <button className="logout-btn" onClick={onLogout}>
