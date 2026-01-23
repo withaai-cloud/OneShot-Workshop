@@ -379,7 +379,7 @@ export const deleteAsset = async (assetId) => {
 
 export const fetchJobCards = async (userId) => {
   const q = query(
-    collection(db, 'job_cards'),
+    collection(db, 'jobcards'),
     where('user_id', '==', userId),
     orderBy('created_at', 'desc')
   );
@@ -392,8 +392,8 @@ export const fetchJobCards = async (userId) => {
 
     // Fetch items for this job card
     const itemsQuery = query(
-      collection(db, 'job_card_items'),
-      where('job_card_id', '==', jobCardId)
+      collection(db, 'jobcardItems'),
+      where('jobCardId', '==', jobCardId)
     );
     const itemsSnapshot = await getDocs(itemsQuery);
     const items = itemsSnapshot.docs.map(item => ({
@@ -420,7 +420,7 @@ export const fetchJobCards = async (userId) => {
 };
 
 export const createJobCard = async (jobCardData, userId) => {
-  const docRef = doc(collection(db, 'job_cards'));
+  const docRef = doc(collection(db, 'jobcards'));
   const data = {
     user_id: userId,
     asset_id: jobCardData.assetId || null,
@@ -437,9 +437,9 @@ export const createJobCard = async (jobCardData, userId) => {
   // Insert job card items if any
   if (jobCardData.items && jobCardData.items.length > 0) {
     for (const item of jobCardData.items) {
-      const itemRef = doc(collection(db, 'job_card_items'));
+      const itemRef = doc(collection(db, 'jobcardItems'));
       await setDoc(itemRef, {
-        job_card_id: docRef.id,
+        jobCardId: docRef.id,
         user_id: userId,
         stock_id: item.stockId || null,
         quantity: item.quantity,
@@ -464,7 +464,7 @@ export const createJobCard = async (jobCardData, userId) => {
 };
 
 export const updateJobCard = async (jobCardId, updates) => {
-  const docRef = doc(db, 'job_cards', jobCardId);
+  const docRef = doc(db, 'jobcards', jobCardId);
   const dbUpdates = {
     title: updates.title,
     description: updates.description,
@@ -477,7 +477,7 @@ export const updateJobCard = async (jobCardId, updates) => {
   await updateDoc(docRef, dbUpdates);
 
   // Delete existing items
-  const itemsQuery = query(collection(db, 'job_card_items'), where('job_card_id', '==', jobCardId));
+  const itemsQuery = query(collection(db, 'jobcardItems'), where('jobCardId', '==', jobCardId));
   const itemsSnapshot = await getDocs(itemsQuery);
   const batch = writeBatch(db);
   itemsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
@@ -487,9 +487,9 @@ export const updateJobCard = async (jobCardId, updates) => {
   if (updates.items && updates.items.length > 0) {
     const user = auth.currentUser;
     for (const item of updates.items) {
-      const itemRef = doc(collection(db, 'job_card_items'));
+      const itemRef = doc(collection(db, 'jobcardItems'));
       await setDoc(itemRef, {
-        job_card_id: jobCardId,
+        jobCardId: jobCardId,
         user_id: user.uid,
         stock_id: item.stockId || null,
         quantity: item.quantity,
@@ -506,13 +506,13 @@ export const updateJobCard = async (jobCardId, updates) => {
 
 export const deleteJobCard = async (jobCardId) => {
   // Delete items first
-  const itemsQuery = query(collection(db, 'job_card_items'), where('job_card_id', '==', jobCardId));
+  const itemsQuery = query(collection(db, 'jobcardItems'), where('jobCardId', '==', jobCardId));
   const itemsSnapshot = await getDocs(itemsQuery);
   const batch = writeBatch(db);
   itemsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
   await batch.commit();
 
-  await deleteDoc(doc(db, 'job_cards', jobCardId));
+  await deleteDoc(doc(db, 'jobcards', jobCardId));
 };
 
 // ==================== BULK OPERATIONS ====================
@@ -619,14 +619,14 @@ export const importUserData = async (userId, importedData) => {
 
 export const clearAllData = async (userId) => {
   // Delete job card items
-  const itemsQuery = query(collection(db, 'job_card_items'), where('user_id', '==', userId));
+  const itemsQuery = query(collection(db, 'jobcardItems'), where('user_id', '==', userId));
   const itemsSnapshot = await getDocs(itemsQuery);
   for (const doc of itemsSnapshot.docs) {
     await deleteDoc(doc.ref);
   }
 
   // Delete job cards
-  const jobCardsQuery = query(collection(db, 'job_cards'), where('user_id', '==', userId));
+  const jobCardsQuery = query(collection(db, 'jobcards'), where('user_id', '==', userId));
   const jobCardsSnapshot = await getDocs(jobCardsQuery);
   for (const doc of jobCardsSnapshot.docs) {
     await deleteDoc(doc.ref);
