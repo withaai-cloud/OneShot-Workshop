@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Profiles collection - users can only access their own profile
+    match /profiles/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Settings collection - users can only access their own settings
+    match /settings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Suppliers collection - users can only access their own suppliers
+    match /suppliers/{supplierId} {
+      allow read, write: if isAuthenticated() &&
+        (resource == null || resource.data.user_id == request.auth.uid) &&
+        (request.resource == null || request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Stock collection - users can only access their own stock
+    match /stock/{stockId} {
+      allow read, write: if isAuthenticated() &&
+        (resource == null || resource.data.user_id == request.auth.uid) &&
+        (request.resource == null || request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Stock batches collection
+    match /stock_batches/{batchId} {
+      allow read, write: if isAuthenticated() &&
+        (resource == null || resource.data.user_id == request.auth.uid) &&
+        (request.resource == null || request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Stock usage collection
+    match /stock_usage/{usageId} {
+      allow read, write: if isAuthenticated() &&
+        (resource == null || resource.data.user_id == request.auth.uid) &&
+        (request.resource == null || request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Assets collection - users can only access their own assets
+    match /assets/{assetId} {
+      allow read, write: if isAuthenticated() &&
+        (resource == null || resource.data.user_id == request.auth.uid) &&
+        (request.resource == null || request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Job cards collection - users can only access their own job cards
+    match /job_cards/{jobCardId} {
+      allow read, write: if isAuthenticated() &&
+        (resource == null || resource.data.user_id == request.auth.uid) &&
+        (request.resource == null || request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Job card items collection
+    match /job_card_items/{itemId} {
+      allow read, write: if isAuthenticated() &&
+        (resource == null || resource.data.user_id == request.auth.uid) &&
+        (request.resource == null || request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+  }
+}

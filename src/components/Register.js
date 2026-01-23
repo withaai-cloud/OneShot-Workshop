@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, User, Building, Loader } from 'lucide-react';
-import { signUp } from '../lib/api';
+import { signUp } from '../lib/firebaseApi';
 
 function Register({ onLogin }) {
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ function Register({ onLogin }) {
     setIsLoading(true);
 
     try {
-      const { user, session } = await signUp(
+      const { user } = await signUp(
         formData.email,
         formData.password,
         formData.name,
@@ -45,21 +45,18 @@ function Register({ onLogin }) {
       );
 
       if (user) {
-        if (session) {
-          // User is automatically signed in (email confirmation disabled)
-          onLogin(user);
-          navigate('/dashboard');
-        } else {
-          // Email confirmation required
-          setSuccess('Account created successfully! Please check your email to confirm your account before logging in.');
-        }
+        // Firebase automatically signs in the user after registration
+        onLogin(user);
+        navigate('/dashboard');
       }
     } catch (err) {
       console.error('Registration error:', err);
-      if (err.message.includes('User already registered')) {
+      if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Please login instead.');
-      } else if (err.message.includes('Password')) {
-        setError(err.message);
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password is too weak. Please use a stronger password.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Invalid email address.');
       } else {
         setError(err.message || 'An error occurred during registration. Please try again.');
       }

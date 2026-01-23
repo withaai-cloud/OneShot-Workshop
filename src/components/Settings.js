@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Globe, Info, Package, Loader } from 'lucide-react';
-import * as api from '../lib/api';
+import * as api from '../lib/firebaseApi';
 
 function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, currentUser }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +52,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
         setIsLoading(true);
         setError('');
         try {
-          await api.clearAllUserData(currentUser.id);
+          await api.clearAllUserData(currentUser.uid);
           setSuccess('All data cleared successfully! The page will now reload.');
           setTimeout(() => window.location.reload(), 1500);
         } catch (err) {
@@ -67,8 +67,8 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
     setIsLoading(true);
     setError('');
     try {
-      const data = await api.exportUserData(currentUser.id);
-      const blob = new Blob([data], { type: 'application/json' });
+      const data = await api.exportUserData(currentUser.uid);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -94,7 +94,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
         if (window.confirm('This will replace all current data. Continue?')) {
           setIsLoading(true);
           setError('');
-          await api.importUserData(currentUser.id, event.target.result);
+          await api.importUserData(currentUser.uid, event.target.result);
           setSuccess('Data imported successfully! The page will now reload.');
           setTimeout(() => window.location.reload(), 1500);
         }

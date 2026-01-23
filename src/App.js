@@ -4,8 +4,9 @@ import './App.css';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
-import { supabase } from './lib/supabase';
-import * as api from './lib/api';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import * as api from './lib/firebaseApi';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -44,29 +45,14 @@ function App() {
 
   // Check for existing session on mount
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (session?.user) {
-          setCurrentUser(session.user);
-          await loadUserData(session.user.id);
-        }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        setCurrentUser(session.user);
-        await loadUserData(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
+    // Listen for auth state changes (Firebase)
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is signed in
+        setCurrentUser(user);
+        await loadUserData(user.uid);
+      } else {
+        // User is signed out
         setCurrentUser(null);
         setStock([]);
         setJobCards([]);
@@ -75,17 +61,18 @@ function App() {
         setCurrency('ZAR');
         setInventoryMethod('FIFO');
       }
+      setIsLoading(false);
     });
 
     return () => {
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, [loadUserData]);
 
   // Auth functions
   const handleLogin = async (user) => {
     setCurrentUser(user);
-    await loadUserData(user.id);
+    await loadUserData(user.uid);
   };
 
   const handleLogout = async () => {
@@ -101,11 +88,11 @@ function App() {
     }
   };
 
-  // Stock functions
+  // Stock functions - FIXED: Use createStock instead of addStock
   const addStock = async (item) => {
     try {
-      const newItem = await api.addStock(currentUser.id, item);
-      setStock(prev => [...prev, { ...newItem, batches: item.batches || [], usageHistory: [] }]);
+      const newItem = await api.createStock(item, currentUser.uid);
+      setStock(prev => [...prev, newItem]);
       return newItem;
     } catch (err) {
       console.error('Error adding stock:', err);
@@ -133,10 +120,10 @@ function App() {
     }
   };
 
-  // Job Card functions
+  // Job Card functions - FIXED: Use createJobCard instead of addJobCard
   const addJobCard = async (jobCard) => {
     try {
-      const newJobCard = await api.addJobCard(currentUser.id, jobCard);
+      const newJobCard = await api.createJobCard(jobCard, currentUser.uid);
       setJobCards(prev => [newJobCard, ...prev]);
       return newJobCard;
     } catch (err) {
@@ -164,11 +151,9 @@ function App() {
       await api.deleteJobCard(id);
       setJobCards(prev => prev.filter(jc => jc.id !== id));
 
-      // If the job card was completed, we might need to restore stock quantities
-      // This would be handled by the backend or a separate function
+      // If the job card was completed, reload stock to get updated quantities
       if (jobCard && jobCard.status === 'completed' && jobCard.items) {
-        // Reload stock to get updated quantities
-        const updatedStock = await api.getStock(currentUser.id);
+        const updatedStock = await api.fetchStock(currentUser.uid);
         setStock(updatedStock);
       }
     } catch (err) {
@@ -177,10 +162,10 @@ function App() {
     }
   };
 
-  // Asset functions
+  // Asset functions - FIXED: Use createAsset instead of addAsset
   const addAsset = async (asset) => {
     try {
-      const newAsset = await api.addAsset(currentUser.id, asset);
+      const newAsset = await api.createAsset(asset, currentUser.uid);
       setAssets(prev => [...prev, newAsset]);
       return newAsset;
     } catch (err) {
@@ -210,10 +195,10 @@ function App() {
     }
   };
 
-  // Supplier functions
+  // Supplier functions - FIXED: Use createSupplier instead of addSupplier
   const addSupplier = async (supplier) => {
     try {
-      const newSupplier = await api.addSupplier(currentUser.id, supplier);
+      const newSupplier = await api.createSupplier(supplier, currentUser.uid);
       setSuppliers(prev => [...prev, newSupplier]);
       return newSupplier;
     } catch (err) {
@@ -250,7 +235,7 @@ function App() {
   // Settings functions
   const handleSetCurrency = async (newCurrency) => {
     try {
-      await api.updateSettings(currentUser.id, { currency: newCurrency, inventory_method: inventoryMethod });
+      await api.updateSettings(currentUser.uid, { currency: newCurrency, inventory_method: inventoryMethod });
       setCurrency(newCurrency);
     } catch (err) {
       console.error('Error updating currency:', err);
@@ -260,7 +245,7 @@ function App() {
 
   const handleSetInventoryMethod = async (newMethod) => {
     try {
-      await api.updateSettings(currentUser.id, { currency, inventory_method: newMethod });
+      await api.updateSettings(currentUser.uid, { currency, inventory_method: newMethod });
       setInventoryMethod(newMethod);
     } catch (err) {
       console.error('Error updating inventory method:', err);
@@ -271,7 +256,7 @@ function App() {
   // Refresh data function (for manual refresh)
   const refreshData = async () => {
     if (currentUser) {
-      await loadUserData(currentUser.id);
+      await loadUserData(currentUser.uid);
     }
   };
 

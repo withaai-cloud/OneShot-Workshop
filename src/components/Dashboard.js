@@ -108,9 +108,9 @@ function Dashboard({
 function Navigation({ currentUser, onLogout, refreshData, dataLoading }) {
   const location = useLocation();
 
-  // Get user display info from Supabase user metadata
-  const userName = currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || 'User';
-  const workshopName = currentUser?.user_metadata?.workshop_name || 'Workshop';
+  // Get user display info from Firebase user
+  const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
+  const workshopName = 'Workshop';
 
   const navItems = [
     { path: '/dashboard', icon: HomeIcon, label: 'Home' },

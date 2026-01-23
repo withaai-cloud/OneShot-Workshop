@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, Loader } from 'lucide-react';
-import { signIn } from '../lib/api';
+import { signIn } from '../lib/firebaseApi';
 
 function Login({ onLogin }) {
   const navigate = useNavigate();
@@ -19,18 +19,18 @@ function Login({ onLogin }) {
     setIsLoading(true);
 
     try {
-      const { user, session } = await signIn(formData.email, formData.password);
+      const { user } = await signIn(formData.email, formData.password);
 
-      if (user && session) {
+      if (user) {
         onLogin(user);
         navigate('/dashboard');
       }
     } catch (err) {
       console.error('Login error:', err);
-      if (err.message.includes('Invalid login credentials')) {
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
         setError('Invalid email or password. Please try again.');
-      } else if (err.message.includes('Email not confirmed')) {
-        setError('Please check your email and confirm your account before logging in.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
       } else {
         setError(err.message || 'An error occurred during login. Please try again.');
       }
