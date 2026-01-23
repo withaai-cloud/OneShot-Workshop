@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+import Welcome from './components/Welcome';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
-import { auth } from './lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import * as api from './lib/firebaseApi';
+import { supabase } from './lib/supabase';
+import * as api from './lib/api';
+import * as cache from './lib/cache';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
 
   // Data state
   const [stock, setStock] = useState([]);
@@ -22,12 +24,60 @@ function App() {
   const [currency, setCurrency] = useState('ZAR');
   const [inventoryMethod, setInventoryMethod] = useState('FIFO');
 
-  // Load all user data from Supabase
-  const loadUserData = useCallback(async (userId) => {
+  // Sync with Supabase in background (doesn't block UI)
+  const syncInBackground = useCallback(async (userId) => {
+    try {
+      console.log('🔄 Syncing in background...');
+      const data = await api.loadAllUserData(userId);
+      
+      // Update state silently
+      setStock(data.stock || []);
+      setJobCards(data.jobCards || []);
+      setAssets(data.assets || []);
+      setSuppliers(data.suppliers || []);
+      setCurrency(data.settings?.currency || 'ZAR');
+      setInventoryMethod(data.settings?.inventory_method || 'FIFO');
+
+      // Update cache
+      cache.setCachedData(userId, data);
+      console.log('✅ Background sync complete');
+    } catch (err) {
+      console.error('Background sync failed (non-critical):', err);
+    }
+  }, []); // Empty deps - this function doesn't depend on state
+
+  // Load all user data with caching
+  const loadUserData = useCallback(async (userId, forceRefresh = false) => {
+    console.log('Loading user data...', { userId, forceRefresh });
+    
+    // Try cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cachedData = cache.getCachedData(userId);
+      if (cachedData) {
+        console.log('✅ Loaded from cache (instant)');
+        setStock(cachedData.stock);
+        setJobCards(cachedData.jobCards);
+        setAssets(cachedData.assets);
+        setSuppliers(cachedData.suppliers);
+        setCurrency(cachedData.settings?.currency || 'ZAR');
+        setInventoryMethod(cachedData.settings?.inventory_method || 'FIFO');
+        setLoadedFromCache(true);
+        
+        // Sync in background (don't block UI)
+        syncInBackground(userId);
+        return;
+      }
+    }
+
+    // No cache or force refresh - load from Supabase
     setDataLoading(true);
     setError(null);
+    setLoadedFromCache(false);
+    
     try {
+      console.log('📡 Loading from Supabase...');
       const data = await api.loadAllUserData(userId);
+      console.log('✅ Loaded from Supabase');
 
       setStock(data.stock || []);
       setJobCards(data.jobCards || []);
@@ -35,24 +85,56 @@ function App() {
       setSuppliers(data.suppliers || []);
       setCurrency(data.settings?.currency || 'ZAR');
       setInventoryMethod(data.settings?.inventory_method || 'FIFO');
+
+      // Save to cache
+      cache.setCachedData(userId, data);
     } catch (err) {
       console.error('Error loading user data:', err);
-      setError('Failed to load data. Please refresh the page.');
+      setError('Failed to load data: ' + err.message);
     } finally {
       setDataLoading(false);
     }
-  }, []);
+  }, [syncInBackground]);
 
   // Check for existing session on mount
   useEffect(() => {
-    // Listen for auth state changes (Firebase)
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // User is signed in
-        setCurrentUser(user);
-        await loadUserData(user.uid);
-      } else {
-        // User is signed out
+    const initAuth = async () => {
+      console.log('Initializing auth...');
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('Session result:', { session: !!session, error });
+
+        if (error) {
+          console.error('Session error:', error);
+          setIsLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          console.log('User found:', session.user.id);
+          setCurrentUser(session.user);
+          await loadUserData(session.user.id);
+        } else {
+          console.log('No session found');
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+      } finally {
+        console.log('Setting isLoading to false');
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        setCurrentUser(session.user);
+        await loadUserData(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
         setStock([]);
         setJobCards([]);
@@ -60,19 +142,19 @@ function App() {
         setSuppliers([]);
         setCurrency('ZAR');
         setInventoryMethod('FIFO');
+        cache.clearCache();
       }
-      setIsLoading(false);
     });
 
     return () => {
-      unsubscribe();
+      subscription.unsubscribe();
     };
   }, [loadUserData]);
 
   // Auth functions
   const handleLogin = async (user) => {
     setCurrentUser(user);
-    await loadUserData(user.uid);
+    await loadUserData(user.id);
   };
 
   const handleLogout = async () => {
@@ -83,16 +165,18 @@ function App() {
       setJobCards([]);
       setAssets([]);
       setSuppliers([]);
+      cache.clearCache();
     } catch (err) {
       console.error('Logout error:', err);
     }
   };
 
-  // Stock functions - FIXED: Use createStock instead of addStock
+  // Stock functions
   const addStock = async (item) => {
     try {
-      const newItem = await api.createStock(item, currentUser.uid);
+      const newItem = await api.createStock(item, currentUser.id);
       setStock(prev => [...prev, newItem]);
+      cache.invalidateCache(); // Invalidate cache on change
       return newItem;
     } catch (err) {
       console.error('Error adding stock:', err);
@@ -104,6 +188,7 @@ function App() {
     try {
       await api.updateStock(id, updatedItem);
       setStock(prev => prev.map(item => item.id === id ? { ...updatedItem, id } : item));
+      cache.invalidateCache();
     } catch (err) {
       console.error('Error updating stock:', err);
       throw err;
@@ -114,17 +199,19 @@ function App() {
     try {
       await api.deleteStock(id);
       setStock(prev => prev.filter(item => item.id !== id));
+      cache.invalidateCache();
     } catch (err) {
       console.error('Error deleting stock:', err);
       throw err;
     }
   };
 
-  // Job Card functions - FIXED: Use createJobCard instead of addJobCard
+  // Job Card functions
   const addJobCard = async (jobCard) => {
     try {
-      const newJobCard = await api.createJobCard(jobCard, currentUser.uid);
+      const newJobCard = await api.createJobCard(jobCard, currentUser.id);
       setJobCards(prev => [newJobCard, ...prev]);
+      cache.invalidateCache();
       return newJobCard;
     } catch (err) {
       console.error('Error adding job card:', err);
@@ -136,6 +223,7 @@ function App() {
     try {
       const updated = await api.updateJobCard(id, updatedJobCard);
       setJobCards(prev => prev.map(jc => jc.id === id ? updated : jc));
+      cache.invalidateCache();
       return updated;
     } catch (err) {
       console.error('Error updating job card:', err);
@@ -145,15 +233,14 @@ function App() {
 
   const deleteJobCard = async (id) => {
     try {
-      // Get the job card to check if we need to restore stock
       const jobCard = jobCards.find(jc => jc.id === id);
 
       await api.deleteJobCard(id);
       setJobCards(prev => prev.filter(jc => jc.id !== id));
+      cache.invalidateCache();
 
-      // If the job card was completed, reload stock to get updated quantities
       if (jobCard && jobCard.status === 'completed' && jobCard.items) {
-        const updatedStock = await api.fetchStock(currentUser.uid);
+        const updatedStock = await api.fetchStock(currentUser.id);
         setStock(updatedStock);
       }
     } catch (err) {
@@ -162,11 +249,12 @@ function App() {
     }
   };
 
-  // Asset functions - FIXED: Use createAsset instead of addAsset
+  // Asset functions
   const addAsset = async (asset) => {
     try {
-      const newAsset = await api.createAsset(asset, currentUser.uid);
+      const newAsset = await api.createAsset(asset, currentUser.id);
       setAssets(prev => [...prev, newAsset]);
+      cache.invalidateCache();
       return newAsset;
     } catch (err) {
       console.error('Error adding asset:', err);
@@ -178,6 +266,7 @@ function App() {
     try {
       const updated = await api.updateAsset(id, updatedAsset);
       setAssets(prev => prev.map(asset => asset.id === id ? updated : asset));
+      cache.invalidateCache();
       return updated;
     } catch (err) {
       console.error('Error updating asset:', err);
@@ -189,17 +278,19 @@ function App() {
     try {
       await api.deleteAsset(id);
       setAssets(prev => prev.filter(asset => asset.id !== id));
+      cache.invalidateCache();
     } catch (err) {
       console.error('Error deleting asset:', err);
       throw err;
     }
   };
 
-  // Supplier functions - FIXED: Use createSupplier instead of addSupplier
+  // Supplier functions
   const addSupplier = async (supplier) => {
     try {
-      const newSupplier = await api.createSupplier(supplier, currentUser.uid);
+      const newSupplier = await api.createSupplier(supplier, currentUser.id);
       setSuppliers(prev => [...prev, newSupplier]);
+      cache.invalidateCache();
       return newSupplier;
     } catch (err) {
       console.error('Error adding supplier:', err);
@@ -211,6 +302,7 @@ function App() {
     try {
       const updated = await api.updateSupplier(id, updatedSupplier);
       setSuppliers(prev => prev.map(supplier => supplier.id === id ? updated : supplier));
+      cache.invalidateCache();
       return updated;
     } catch (err) {
       console.error('Error updating supplier:', err);
@@ -222,10 +314,10 @@ function App() {
     try {
       await api.deleteSupplier(id);
       setSuppliers(prev => prev.filter(supplier => supplier.id !== id));
-      // Update stock items that referenced this supplier
       setStock(prev => prev.map(item =>
         item.supplierId === id ? { ...item, supplierId: null } : item
       ));
+      cache.invalidateCache();
     } catch (err) {
       console.error('Error deleting supplier:', err);
       throw err;
@@ -235,8 +327,9 @@ function App() {
   // Settings functions
   const handleSetCurrency = async (newCurrency) => {
     try {
-      await api.updateSettings(currentUser.uid, { currency: newCurrency, inventory_method: inventoryMethod });
+      await api.updateSettings(currentUser.id, { currency: newCurrency, inventory_method: inventoryMethod });
       setCurrency(newCurrency);
+      cache.invalidateCache();
     } catch (err) {
       console.error('Error updating currency:', err);
       throw err;
@@ -245,8 +338,9 @@ function App() {
 
   const handleSetInventoryMethod = async (newMethod) => {
     try {
-      await api.updateSettings(currentUser.uid, { currency, inventory_method: newMethod });
+      await api.updateSettings(currentUser.id, { currency, inventory_method: newMethod });
       setInventoryMethod(newMethod);
+      cache.invalidateCache();
     } catch (err) {
       console.error('Error updating inventory method:', err);
       throw err;
@@ -256,7 +350,7 @@ function App() {
   // Refresh data function (for manual refresh)
   const refreshData = async () => {
     if (currentUser) {
-      await loadUserData(currentUser.uid);
+      await loadUserData(currentUser.id, true); // Force refresh
     }
   };
 
@@ -264,6 +358,7 @@ function App() {
     return (
       <div className="loading-screen">
         <img src={process.env.PUBLIC_URL + "/header.png"} alt="OneShot Workshop" style={{ maxWidth: '300px' }} />
+        <div className="spinner"></div>
         <p>Loading...</p>
       </div>
     );
@@ -278,7 +373,26 @@ function App() {
             <button onClick={() => setError(null)}>Dismiss</button>
           </div>
         )}
+        {loadedFromCache && !dataLoading && (
+          <div className="cache-indicator" style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            background: '#10b981',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            zIndex: 1000,
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}>
+            ⚡ Loaded instantly from cache
+          </div>
+        )}
         <Routes>
+          {/* Welcome/Landing Page */}
+          <Route path="/" element={<Welcome />} />
+          
           {/* Public routes */}
           <Route path="/login" element={
             currentUser ? <Navigate to="/dashboard" /> : <Login onLogin={handleLogin} />
@@ -319,11 +433,6 @@ function App() {
             ) : (
               <Navigate to="/login" />
             )
-          } />
-
-          {/* Redirect root to login or dashboard */}
-          <Route path="/" element={
-            <Navigate to={currentUser ? "/dashboard" : "/login"} />
           } />
         </Routes>
       </div>
