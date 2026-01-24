@@ -243,8 +243,20 @@ export const updateStock = async (stockId, updates) => {
     average_cost: updates.averageCost
   };
   await updateDoc(docRef, dbUpdates);
-  const docSnap = await getDoc(docRef);
-  return { id: docSnap.id, ...docSnap.data() };
+  
+  // Return transformed data (camelCase)
+  return {
+    id: stockId,
+    name: updates.name,
+    description: updates.description,
+    partNumber: updates.partNumber,
+    category: updates.category,
+    supplierId: updates.supplierId,
+    totalQuantity: updates.totalQuantity,
+    averageCost: updates.averageCost,
+    batches: updates.batches || [],
+    usageHistory: updates.usageHistory || []
+  };
 };
 
 export const deleteStock = async (stockId) => {
