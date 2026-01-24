@@ -27,11 +27,51 @@
 
 .nav-logo {
   height: 40px;
+  width: auto;
+  object-fit: contain;
 }
 
 .nav-buttons {
   display: flex;
   gap: 1rem;
+  align-items: center;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: #1f2937;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  border-color: #ff7a59;
+  color: #ff7a59;
+  background: #fff5f2;
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ff7a59 0%, #ff5733 100%);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 122, 89, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 122, 89, 0.4);
 }
 
 /* Hero Section */
@@ -359,8 +399,10 @@
 
 .footer-logo {
   height: 40px;
+  width: auto;
   margin-bottom: 1rem;
   filter: brightness(0) invert(1);
+  object-fit: contain;
 }
 
 .footer-brand p {
