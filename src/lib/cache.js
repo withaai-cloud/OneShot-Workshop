@@ -1,5 +1,5 @@
 // src/lib/cache.js
-// Cache layer for instant loads with Supabase sync
+// Cache layer for instant loads with Firebase sync
 
 const CACHE_KEYS = {
   STOCK: 'workshop_cache_stock',
@@ -60,7 +60,7 @@ export const getCachedData = (userId) => {
     const jobCards = JSON.parse(localStorage.getItem(CACHE_KEYS.JOB_CARDS) || '[]');
     const assets = JSON.parse(localStorage.getItem(CACHE_KEYS.ASSETS) || '[]');
     const suppliers = JSON.parse(localStorage.getItem(CACHE_KEYS.SUPPLIERS) || '[]');
-    const settings = JSON.parse(localStorage.getItem(CACHE_KEYS.SETTINGS) || '{"currency":"ZAR","inventory_method":"FIFO"}');
+    const settings = JSON.parse(localStorage.getItem(CACHE_KEYS.SETTINGS) || '{"currency":"ZAR","inventoryMethod":"FIFO"}');
 
     return {
       stock,
@@ -85,7 +85,7 @@ export const setCachedData = (userId, data) => {
     localStorage.setItem(CACHE_KEYS.JOB_CARDS, JSON.stringify(data.jobCards || []));
     localStorage.setItem(CACHE_KEYS.ASSETS, JSON.stringify(data.assets || []));
     localStorage.setItem(CACHE_KEYS.SUPPLIERS, JSON.stringify(data.suppliers || []));
-    localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(data.settings || { currency: 'ZAR', inventory_method: 'FIFO' }));
+    localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(data.settings || { currency: 'ZAR', inventoryMethod: 'FIFO' }));
     localStorage.setItem(CACHE_KEYS.TIMESTAMP, Date.now().toString());
 
     console.log('Cache saved successfully');

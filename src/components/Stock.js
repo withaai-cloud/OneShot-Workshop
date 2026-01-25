@@ -174,7 +174,7 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers 
         addStock(newItem);
       } else {
         // Add to existing stock item
-        const existingItem = stock.find(s => s.id === parseInt(item.stockId));
+        const existingItem = stock.find(s => s.id === item.stockId);
         if (existingItem) {
           const batches = existingItem.batches || [];
           
@@ -435,8 +435,8 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers 
                     <td>{item.partNumber || '-'}</td>
                     <td><span className="badge">{item.category}</span></td>
                     <td>
-                      {item.supplierId && suppliers ? 
-                        suppliers.find(s => s.id === parseInt(item.supplierId))?.name || '-' 
+                      {item.supplierId && suppliers ?
+                        suppliers.find(s => s.id === item.supplierId)?.name || '-'
                         : '-'}
                     </td>
                     <td>

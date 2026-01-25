@@ -35,7 +35,7 @@ function Reports({ stock, jobCards, assets, currency }) {
             return itemSum + item.actualCost;
           }
           // Fallback to old calculation
-          const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+          const stockItem = stock.find(s => s.id === item.stockId);
           return itemSum + ((stockItem?.unitCost || stockItem?.averageCost || 0) * item.quantity);
         }, 0) : 0;
         return sum + itemsCost + (parseFloat(jc.laborCost) || 0);
@@ -44,7 +44,7 @@ function Reports({ stock, jobCards, assets, currency }) {
 
   const getExpensesByAsset = () => {
     return assets.map(asset => {
-      const assetJobCards = jobCards.filter(jc => parseInt(jc.assetId) === parseInt(asset.id) && jc.status === 'completed');
+      const assetJobCards = jobCards.filter(jc => jc.assetId === asset.id && jc.status === 'completed');
       const totalCost = assetJobCards.reduce((sum, jc) => {
         const itemsCost = jc.items ? jc.items.reduce((itemSum, item) => {
           // Use actualCost if available (new system)
@@ -52,12 +52,12 @@ function Reports({ stock, jobCards, assets, currency }) {
             return itemSum + item.actualCost;
           }
           // Fallback to old calculation
-          const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+          const stockItem = stock.find(s => s.id === item.stockId);
           return itemSum + ((stockItem?.unitCost || stockItem?.averageCost || 0) * item.quantity);
         }, 0) : 0;
         return sum + itemsCost + (parseFloat(jc.laborCost) || 0);
       }, 0);
-      
+
       return {
         asset,
         jobCardCount: assetJobCards.length,
@@ -68,13 +68,13 @@ function Reports({ stock, jobCards, assets, currency }) {
 
   const getExpensesByCategory = () => {
     const categoryMap = {};
-    
+
     jobCards
       .filter(jc => jc.status === 'completed')
       .forEach(jc => {
         if (jc.items) {
           jc.items.forEach(item => {
-            const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+            const stockItem = stock.find(s => s.id === item.stockId);
             if (stockItem) {
               const category = stockItem.category;
               if (!categoryMap[category]) {

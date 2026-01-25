@@ -62,7 +62,7 @@ service cloud.firestore {
     }
 
     // Job cards collection - users can only access their own job cards
-    match /job_cards/{jobCardId} {
+    match /jobcards/{jobCardId} {
       allow read, write: if isAuthenticated() &&
         (resource == null || resource.data.user_id == request.auth.uid) &&
         (request.resource == null || request.resource.data.user_id == request.auth.uid);
@@ -70,7 +70,7 @@ service cloud.firestore {
     }
 
     // Job card items collection
-    match /job_card_items/{itemId} {
+    match /jobcardItems/{itemId} {
       allow read, write: if isAuthenticated() &&
         (resource == null || resource.data.user_id == request.auth.uid) &&
         (request.resource == null || request.resource.data.user_id == request.auth.uid);

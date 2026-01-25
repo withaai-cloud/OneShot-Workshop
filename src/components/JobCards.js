@@ -172,7 +172,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
     
     // Recalculate cost when stockId or quantity changes
     if (field === 'stockId' || field === 'quantity') {
-      const stockItem = stock.find(s => s.id === parseInt(newItems[index].stockId));
+      const stockItem = stock.find(s => s.id === newItems[index].stockId);
       if (stockItem && newItems[index].quantity > 0) {
         const { cost } = calculateItemCost(stockItem, newItems[index].quantity);
         newItems[index].actualCost = cost;
@@ -193,7 +193,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
     // Validate stock availability
     for (const item of formData.items) {
       if (item.stockId) {
-        const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+        const stockItem = stock.find(s => s.id === item.stockId);
         if (stockItem) {
           if (stockItem.totalQuantity < item.quantity) {
             alert(`Not enough stock for ${stockItem.name}. Available: ${stockItem.totalQuantity}`);
@@ -205,7 +205,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
 
     // Calculate actual costs and deduct stock
     const itemsWithCosts = formData.items.map(item => {
-      const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+      const stockItem = stock.find(s => s.id === item.stockId);
       if (stockItem) {
         const { cost } = calculateItemCost(stockItem, item.quantity);
         return { ...item, actualCost: cost };
@@ -213,27 +213,27 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
       return item;
     });
 
-    const updatedFormData = { 
-      ...formData, 
+    const updatedFormData = {
+      ...formData,
       items: itemsWithCosts,
       status: 'completed',
       costingMethod: inventoryMethod // Save which method was used
     };
-    
+
     // Deduct stock and record usage
     formData.items.forEach(item => {
       if (item.stockId) {
-        const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+        const stockItem = stock.find(s => s.id === item.stockId);
         if (stockItem) {
           const updatedStock = deductStock(stockItem, item.quantity);
-          
+
           // Add usage history
           const usageRecord = {
             date: formData.date,
             quantity: item.quantity,
             cost: calculateItemCost(stockItem, item.quantity).cost,
             jobCardTitle: formData.title,
-            assetName: assets.find(a => a.id === parseInt(formData.assetId))?.name || 'Unknown'
+            assetName: assets.find(a => a.id === formData.assetId)?.name || 'Unknown'
           };
           
           // Initialize usageHistory if it doesn't exist
@@ -259,7 +259,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
   const calculateTotal = () => {
     const itemsTotal = formData.items.reduce((sum, item) => {
       if (item.stockId) {
-        const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+        const stockItem = stock.find(s => s.id === item.stockId);
         if (stockItem) {
           const { cost } = calculateItemCost(stockItem, item.quantity);
           return sum + cost;
@@ -383,7 +383,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
                 </div>
                 
                 {formData.items.map((item, index) => {
-                  const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+                  const stockItem = stock.find(s => s.id === item.stockId);
                   const itemCost = stockItem ? calculateItemCost(stockItem, item.quantity).cost : 0;
                   
                   return (
@@ -461,7 +461,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
               </div>
               <div className="detail-row">
                 <strong>Asset:</strong>
-                <span>{assets.find(a => a.id === parseInt(viewingJobCard.assetId))?.name || 'N/A'}</span>
+                <span>{assets.find(a => a.id === viewingJobCard.assetId)?.name || 'N/A'}</span>
               </div>
               <div className="detail-row">
                 <strong>Date:</strong>
@@ -500,7 +500,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
                   </thead>
                   <tbody>
                     {viewingJobCard.items.map((item, idx) => {
-                      const stockItem = stock.find(s => s.id === parseInt(item.stockId));
+                      const stockItem = stock.find(s => s.id === item.stockId);
                       return (
                         <tr key={idx}>
                           <td>{stockItem?.name || 'Unknown'}</td>
@@ -538,7 +538,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
                 <div className="list-item-content">
                   <h3 className="list-item-title">{jc.title}</h3>
                   <p className="list-item-subtitle">
-                    {assets.find(a => a.id === parseInt(jc.assetId))?.name || 'N/A'} • {jc.date}
+                    {assets.find(a => a.id === jc.assetId)?.name || 'N/A'} • {jc.date}
                   </p>
                   <div className="list-item-details">
                     <div className="list-item-detail">

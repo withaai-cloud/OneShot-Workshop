@@ -37,7 +37,7 @@ function App() {
       setAssets(data.assets || []);
       setSuppliers(data.suppliers || []);
       setCurrency(data.settings?.currency || 'ZAR');
-      setInventoryMethod(data.settings?.inventory_method || 'FIFO');
+      setInventoryMethod(data.settings?.inventoryMethod || 'FIFO');
 
       // Update cache
       cache.setCachedData(userId, data);
@@ -61,7 +61,7 @@ function App() {
         setAssets(cachedData.assets);
         setSuppliers(cachedData.suppliers);
         setCurrency(cachedData.settings?.currency || 'ZAR');
-        setInventoryMethod(cachedData.settings?.inventory_method || 'FIFO');
+        setInventoryMethod(cachedData.settings?.inventoryMethod || 'FIFO');
         setLoadedFromCache(true);
         
         // Sync in background (don't block UI)
@@ -85,7 +85,7 @@ function App() {
       setAssets(data.assets || []);
       setSuppliers(data.suppliers || []);
       setCurrency(data.settings?.currency || 'ZAR');
-      setInventoryMethod(data.settings?.inventory_method || 'FIFO');
+      setInventoryMethod(data.settings?.inventoryMethod || 'FIFO');
 
       // Save to cache
       cache.setCachedData(userId, data);
@@ -299,7 +299,7 @@ function App() {
   // Settings functions
   const handleSetCurrency = async (newCurrency) => {
     try {
-      await api.updateSettings(currentUser.uid, { currency: newCurrency, inventory_method: inventoryMethod });
+      await api.updateSettings(currentUser.uid, { currency: newCurrency, inventoryMethod: inventoryMethod });
       setCurrency(newCurrency);
       cache.invalidateCache();
     } catch (err) {
@@ -310,7 +310,7 @@ function App() {
 
   const handleSetInventoryMethod = async (newMethod) => {
     try {
-      await api.updateSettings(currentUser.uid, { currency, inventory_method: newMethod });
+      await api.updateSettings(currentUser.uid, { currency, inventoryMethod: newMethod });
       setInventoryMethod(newMethod);
       cache.invalidateCache();
     } catch (err) {

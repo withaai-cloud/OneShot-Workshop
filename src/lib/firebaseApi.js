@@ -74,16 +74,32 @@ export const getProfile = async (userId) => {
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-    return docSnap.data();
+    const data = docSnap.data();
+    return {
+      id: data.id,
+      email: data.email,
+      fullName: data.full_name || '',
+      workshopName: data.workshop_name || '',
+      createdAt: data.created_at
+    };
   }
   return null;
 };
 
 export const updateProfileData = async (userId, updates) => {
   const docRef = doc(db, 'profiles', userId);
-  await updateDoc(docRef, updates);
-  const docSnap = await getDoc(docRef);
-  return docSnap.data();
+  const dbUpdates = {
+    full_name: updates.fullName,
+    workshop_name: updates.workshopName
+  };
+  await updateDoc(docRef, dbUpdates);
+
+  // Return transformed data (camelCase)
+  return {
+    id: userId,
+    fullName: updates.fullName,
+    workshopName: updates.workshopName
+  };
 };
 
 // ==================== SETTINGS ====================
@@ -93,17 +109,30 @@ export const getSettings = async (userId) => {
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-    return docSnap.data();
+    const data = docSnap.data();
+    return {
+      currency: data.currency || 'ZAR',
+      inventoryMethod: data.inventory_method || 'FIFO'
+    };
   }
   // Return defaults if not found
-  return { currency: 'ZAR', inventory_method: 'FIFO' };
+  return { currency: 'ZAR', inventoryMethod: 'FIFO' };
 };
 
 export const updateSettings = async (userId, updates) => {
   const docRef = doc(db, 'settings', userId);
-  await setDoc(docRef, { user_id: userId, ...updates }, { merge: true });
-  const docSnap = await getDoc(docRef);
-  return docSnap.data();
+  const dbUpdates = {
+    user_id: userId,
+    currency: updates.currency,
+    inventory_method: updates.inventoryMethod
+  };
+  await setDoc(docRef, dbUpdates, { merge: true });
+
+  // Return transformed data (camelCase)
+  return {
+    currency: updates.currency,
+    inventoryMethod: updates.inventoryMethod
+  };
 };
 
 // ==================== SUPPLIERS ====================
@@ -115,25 +144,68 @@ export const fetchSuppliers = async (userId) => {
     orderBy('name')
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name || '',
+      contactPerson: data.contact_person || '',
+      email: data.email || '',
+      phone: data.phone || '',
+      address: data.address || '',
+      notes: data.notes || ''
+    };
+  });
 };
 
 export const createSupplier = async (supplierData, userId) => {
   const docRef = doc(collection(db, 'suppliers'));
   const data = {
-    ...supplierData,
     user_id: userId,
+    name: supplierData.name,
+    contact_person: supplierData.contactPerson || '',
+    email: supplierData.email || '',
+    phone: supplierData.phone || '',
+    address: supplierData.address || '',
+    notes: supplierData.notes || '',
     created_at: new Date().toISOString()
   };
   await setDoc(docRef, data);
-  return { id: docRef.id, ...data };
+
+  // Return transformed data (camelCase)
+  return {
+    id: docRef.id,
+    name: data.name,
+    contactPerson: data.contact_person,
+    email: data.email,
+    phone: data.phone,
+    address: data.address,
+    notes: data.notes
+  };
 };
 
 export const updateSupplier = async (supplierId, updates) => {
   const docRef = doc(db, 'suppliers', supplierId);
-  await updateDoc(docRef, updates);
-  const docSnap = await getDoc(docRef);
-  return { id: docSnap.id, ...docSnap.data() };
+  const dbUpdates = {
+    name: updates.name,
+    contact_person: updates.contactPerson,
+    email: updates.email,
+    phone: updates.phone,
+    address: updates.address,
+    notes: updates.notes
+  };
+  await updateDoc(docRef, dbUpdates);
+
+  // Return transformed data (camelCase)
+  return {
+    id: supplierId,
+    name: updates.name,
+    contactPerson: updates.contactPerson,
+    email: updates.email,
+    phone: updates.phone,
+    address: updates.address,
+    notes: updates.notes
+  };
 };
 
 export const deleteSupplier = async (supplierId) => {
@@ -243,7 +315,7 @@ export const updateStock = async (stockId, updates) => {
     average_cost: updates.averageCost
   };
   await updateDoc(docRef, dbUpdates);
-  
+
   // Return transformed data (camelCase)
   return {
     id: stockId,
@@ -312,7 +384,16 @@ export const addStockUsage = async (stockId, usageData, userId) => {
     created_at: new Date().toISOString()
   };
   await setDoc(docRef, data);
-  return { id: docRef.id, ...data };
+
+  // Return transformed data (camelCase)
+  return {
+    id: docRef.id,
+    date: usageData.date,
+    quantity: parseFloat(usageData.quantity) || 0,
+    cost: parseFloat(usageData.cost) || 0,
+    jobCardTitle: usageData.jobCardTitle,
+    assetName: usageData.assetName || ''
+  };
 };
 
 // ==================== ASSETS ====================
@@ -379,8 +460,18 @@ export const updateAsset = async (assetId, updates) => {
     description: updates.description
   };
   await updateDoc(docRef, dbUpdates);
-  const docSnap = await getDoc(docRef);
-  return { id: docSnap.id, ...docSnap.data() };
+
+  // Return transformed data (camelCase)
+  return {
+    id: assetId,
+    name: updates.name,
+    type: updates.type,
+    registrationNumber: updates.registrationNumber,
+    make: updates.make,
+    model: updates.model,
+    year: updates.year,
+    description: updates.description
+  };
 };
 
 export const deleteAsset = async (assetId) => {
@@ -512,8 +603,18 @@ export const updateJobCard = async (jobCardId, updates) => {
     }
   }
 
-  const docSnap = await getDoc(docRef);
-  return { id: docSnap.id, ...docSnap.data(), items: updates.items || [] };
+  // Return transformed data (camelCase)
+  return {
+    id: jobCardId,
+    title: updates.title,
+    description: updates.description,
+    assetId: updates.assetId,
+    date: updates.date,
+    laborCost: parseFloat(updates.laborCost) || 0,
+    status: updates.status,
+    costingMethod: updates.costingMethod,
+    items: updates.items || []
+  };
 };
 
 export const deleteJobCard = async (jobCardId) => {

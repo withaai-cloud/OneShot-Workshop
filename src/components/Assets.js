@@ -57,7 +57,7 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
   };
 
   const handleDelete = (id) => {
-    const hasJobCards = jobCards.some(jc => parseInt(jc.assetId) === parseInt(id));
+    const hasJobCards = jobCards.some(jc => jc.assetId === id);
     if (hasJobCards) {
       if (!window.confirm('This asset has job cards associated with it. Are you sure you want to delete it?')) {
         return;
@@ -69,9 +69,9 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
   };
 
   const getAssetStats = (assetId) => {
-    // Filter job cards for this asset (handle both string and number IDs)
-    const assetJobCards = jobCards.filter(jc => 
-      parseInt(jc.assetId) === parseInt(assetId) && jc.status === 'completed'
+    // Filter job cards for this asset
+    const assetJobCards = jobCards.filter(jc =>
+      jc.assetId === assetId && jc.status === 'completed'
     );
     
     const totalCost = assetJobCards.reduce((sum, jc) => {

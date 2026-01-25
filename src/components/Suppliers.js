@@ -54,7 +54,7 @@ function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, sto
   };
 
   const handleDelete = (id) => {
-    const hasStock = stock.some(item => parseInt(item.supplierId) === parseInt(id));
+    const hasStock = stock.some(item => item.supplierId === id);
     if (hasStock) {
       if (!window.confirm('This supplier has stock items linked to it. Are you sure you want to delete it? The stock items will remain but lose their supplier link.')) {
         return;
@@ -66,7 +66,7 @@ function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, sto
   };
 
   const getSupplierStats = (supplierId) => {
-    const supplierStock = stock.filter(item => parseInt(item.supplierId) === parseInt(supplierId));
+    const supplierStock = stock.filter(item => item.supplierId === supplierId);
     const totalItems = supplierStock.length;
     
     // Calculate current stock value using new batch system
@@ -103,7 +103,7 @@ function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, sto
   };
 
   const viewingSupplier = suppliers.find(s => s.id === viewingId);
-  const supplierStock = viewingSupplier ? stock.filter(item => parseInt(item.supplierId) === parseInt(viewingId)) : [];
+  const supplierStock = viewingSupplier ? stock.filter(item => item.supplierId === viewingId) : [];
 
   return (
     <div className="page-container">
@@ -121,7 +121,7 @@ function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, sto
         </div>
         <div className="stat-box">
           <h3>Active Suppliers</h3>
-          <p className="stat-value">{suppliers.filter(s => stock.some(item => parseInt(item.supplierId) === parseInt(s.id))).length}</p>
+          <p className="stat-value">{suppliers.filter(s => stock.some(item => item.supplierId === s.id)).length}</p>
         </div>
         <div className="stat-box">
           <h3>Total Stock Value</h3>
