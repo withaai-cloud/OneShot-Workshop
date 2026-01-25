@@ -42,7 +42,7 @@ function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency }) {
     
     // If stockId changed to existing item, populate fields
     if (field === 'stockId' && value !== 'new') {
-      const existingItem = stock.find(s => s.id === parseInt(value));
+      const existingItem = stock.find(s => s.id === value); // ✅ FIXED: Removed parseInt
       if (existingItem) {
         newItems[index] = {
           ...newItems[index],
@@ -69,7 +69,7 @@ function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency }) {
 
   const calculateTotal = () => {
     return invoiceData.items.reduce((sum, item) => {
-      return sum + (item.quantity * item.unitCost);
+      return sum + (parseFloat(item.quantity) * parseFloat(item.unitCost)); // ✅ Added parseFloat for safety
     }, 0);
   };
 
@@ -251,7 +251,7 @@ function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency }) {
                             step="1"
                             placeholder="0"
                             value={item.quantity || ''}
-                            onChange={(e) => updateInvoiceItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateInvoiceItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                             className="invoice-input"
                             required
                           />
@@ -269,7 +269,7 @@ function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency }) {
                           />
                         </td>
                         <td className="invoice-total-cell">
-                          {getCurrencySymbol()}{(item.quantity * item.unitCost).toFixed(2)}
+                          {getCurrencySymbol()}{((parseFloat(item.quantity) || 0) * (parseFloat(item.unitCost) || 0)).toFixed(2)}
                         </td>
                         <td>
                           <input
