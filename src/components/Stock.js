@@ -152,9 +152,18 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
   };
 
   const handleInvoiceSave = async (invoiceData) => {
+    if (!currentUser?.uid) {
+      alert('Error: User not logged in. Please refresh and try again.');
+      return;
+    }
+
     try {
+      console.log('Processing invoice with', invoiceData.items.length, 'items');
+
       // Process each item in the invoice
       for (const item of invoiceData.items) {
+        console.log('Processing item:', item.name || item.stockId, 'qty:', item.quantity);
+
         if (item.stockId === 'new') {
           // Create new stock item WITHOUT batches array (let Firebase handle it)
           const newItem = {
@@ -169,8 +178,10 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
 
           // Add stock item to Firebase
           const createdStock = await addStock(newItem);
+          console.log('Created stock item:', createdStock.id, 'totalQuantity:', createdStock.totalQuantity);
 
           // Create batch record in stock_batches collection
+          console.log('Creating batch for stock:', createdStock.id);
           await api.addStockBatch(createdStock.id, {
             date: invoiceData.invoiceDate,
             quantity: item.quantity,
@@ -195,9 +206,11 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
             };
 
             // Update stock totals in Firebase
+            console.log('Updating existing stock:', existingItem.id, 'newQty:', newQuantity, 'avgCost:', newAverageCost);
             await updateStock(existingItem.id, updatedItem);
 
             // Create batch record in stock_batches collection
+            console.log('Creating batch for existing stock:', existingItem.id);
             await api.addStockBatch(existingItem.id, {
               date: invoiceData.invoiceDate,
               quantity: item.quantity,
