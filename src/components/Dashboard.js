@@ -47,6 +47,7 @@ function Dashboard({
               deleteStock={deleteStock}
               currency={currency}
               suppliers={suppliers}
+              currentUser={currentUser}
             />
           } />
           <Route path="/job-cards" element={

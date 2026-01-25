@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Search, ChevronDown, ChevronUp, History, FileText } from 'lucide-react';
 import PurchaseInvoice from './PurchaseInvoice';
+import * as api from '../lib/firebaseApi';
 
-function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers }) {
+function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers, currentUser }) {
   const [isAdding, setIsAdding] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -150,73 +151,68 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers 
     }
   };
 
-  const handleInvoiceSave = (invoiceData) => {
-    // Process each item in the invoice
-    invoiceData.items.forEach(item => {
-      if (item.stockId === 'new') {
-        // Create new stock item
-        const newItem = {
-          name: item.name,
-          description: item.description,
-          partNumber: item.partNumber,
-          category: item.category,
-          supplierId: invoiceData.supplierId,
-          batches: [{
-            batchId: Date.now() + Math.random(),
+  const handleInvoiceSave = async (invoiceData) => {
+    try {
+      // Process each item in the invoice
+      for (const item of invoiceData.items) {
+        if (item.stockId === 'new') {
+          // Create new stock item WITHOUT batches array (let Firebase handle it)
+          const newItem = {
+            name: item.name,
+            description: item.description,
+            partNumber: item.partNumber,
+            category: item.category,
+            supplierId: invoiceData.supplierId,
+            totalQuantity: item.quantity,
+            averageCost: item.unitCost
+          };
+
+          // Add stock item to Firebase
+          const createdStock = await addStock(newItem);
+
+          // Create batch record in stock_batches collection
+          await api.addStockBatch(createdStock.id, {
             date: invoiceData.invoiceDate,
             quantity: item.quantity,
             unitCost: item.unitCost,
             invoiceNumber: invoiceData.invoiceNumber
-          }],
-          totalQuantity: item.quantity,
-          averageCost: item.unitCost
-        };
-        addStock(newItem);
-      } else {
-        // Add to existing stock item
-        const existingItem = stock.find(s => s.id === item.stockId);
-        if (existingItem) {
-          const batches = existingItem.batches || [];
-          
-          // Check if there's a batch with same price from same invoice date
-          const samePriceBatchIndex = batches.findIndex(batch => 
-            Math.abs(batch.unitCost - item.unitCost) < 0.01 &&
-            batch.date === invoiceData.invoiceDate
-          );
-          
-          let updatedBatches;
-          if (samePriceBatchIndex !== -1) {
-            // Add to existing batch
-            updatedBatches = [...batches];
-            updatedBatches[samePriceBatchIndex].quantity += item.quantity;
-          } else {
-            // Create new batch
-            const newBatch = {
-              batchId: Date.now() + Math.random(),
+          }, currentUser.uid);
+
+        } else {
+          // Add to existing stock item
+          const existingItem = stock.find(s => s.id === item.stockId);
+          if (existingItem) {
+            // Calculate new totals using weighted average
+            const newQuantity = (existingItem.totalQuantity || 0) + item.quantity;
+            const existingValue = (existingItem.totalQuantity || 0) * (existingItem.averageCost || 0);
+            const newValue = item.quantity * item.unitCost;
+            const newAverageCost = newQuantity > 0 ? (existingValue + newValue) / newQuantity : 0;
+
+            const updatedItem = {
+              ...existingItem,
+              totalQuantity: newQuantity,
+              averageCost: newAverageCost
+            };
+
+            // Update stock totals in Firebase
+            await updateStock(existingItem.id, updatedItem);
+
+            // Create batch record in stock_batches collection
+            await api.addStockBatch(existingItem.id, {
               date: invoiceData.invoiceDate,
               quantity: item.quantity,
               unitCost: item.unitCost,
               invoiceNumber: invoiceData.invoiceNumber
-            };
-            updatedBatches = [...batches, newBatch];
+            }, currentUser.uid);
           }
-          
-          // Sort batches by date
-          updatedBatches.sort((a, b) => new Date(a.date) - new Date(b.date));
-          
-          const updatedItem = {
-            ...existingItem,
-            batches: updatedBatches,
-            totalQuantity: getTotalQuantity(updatedBatches),
-            averageCost: calculateAverageCost(updatedBatches)
-          };
-          
-          updateStock(existingItem.id, updatedItem);
         }
       }
-    });
-    
-    alert(`Invoice saved successfully! ${invoiceData.items.length} items processed.`);
+
+      alert(`Invoice saved successfully! ${invoiceData.items.length} items processed.`);
+    } catch (error) {
+      console.error('Error saving invoice:', error);
+      alert('Error saving invoice: ' + error.message);
+    }
   };
 
   const toggleExpand = (itemId) => {
