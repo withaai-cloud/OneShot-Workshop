@@ -283,8 +283,8 @@ export const createStock = async (stockData, userId) => {
     description: stockData.description || '',
     part_number: stockData.partNumber || '',
     category: stockData.category,
-    total_quantity: 0,
-    average_cost: 0,
+    total_quantity: stockData.totalQuantity || 0,
+    average_cost: stockData.averageCost || 0,
     created_at: new Date().toISOString()
   };
   await setDoc(docRef, data);
@@ -296,8 +296,8 @@ export const createStock = async (stockData, userId) => {
     partNumber: data.part_number,
     category: data.category,
     supplierId: data.supplier_id,
-    totalQuantity: 0,
-    averageCost: 0,
+    totalQuantity: data.total_quantity,
+    averageCost: data.average_cost,
     batches: [],
     usageHistory: []
   };
