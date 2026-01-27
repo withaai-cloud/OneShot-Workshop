@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Save, Eye, FileText } from 'lucide-react';
+import * as api from '../lib/firebaseApi';
 
-function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, updateStock, assets, currency, inventoryMethod }) {
+function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, updateStock, assets, currency, inventoryMethod, currentUser }) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [viewingId, setViewingId] = useState(null);
@@ -27,22 +28,31 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
 
   // Calculate cost based on inventory method
   const calculateItemCost = (stockItem, quantityNeeded) => {
-    if (!stockItem || !stockItem.batches) return { cost: 0, batches: [] };
+    if (!stockItem) return { cost: 0, batches: [] };
+
+    // If no batches exist, use averageCost (weighted average fallback)
+    if (!stockItem.batches || stockItem.batches.length === 0) {
+      const avgCost = stockItem.averageCost || 0;
+      return {
+        cost: quantityNeeded * avgCost,
+        batches: [{ quantity: quantityNeeded, unitCost: avgCost }]
+      };
+    }
 
     if (inventoryMethod === 'FIFO') {
       // FIFO: Use oldest batches first
       let remaining = quantityNeeded;
       let totalCost = 0;
       const batchesUsed = [];
-      
+
       // Sort batches by date (oldest first)
-      const sortedBatches = [...stockItem.batches].sort((a, b) => 
+      const sortedBatches = [...stockItem.batches].sort((a, b) =>
         new Date(a.date) - new Date(b.date)
       );
-      
+
       for (const batch of sortedBatches) {
         if (remaining <= 0) break;
-        
+
         const quantityFromBatch = Math.min(batch.quantity, remaining);
         totalCost += quantityFromBatch * batch.unitCost;
         batchesUsed.push({
@@ -52,7 +62,7 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
         });
         remaining -= quantityFromBatch;
       }
-      
+
       return { cost: totalCost, batches: batchesUsed };
     } else {
       // Weighted Average: Use average cost
@@ -66,16 +76,27 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
 
   // Deduct stock using FIFO or update batches
   const deductStock = (stockItem, quantityNeeded) => {
+    // If no batches exist, simply deduct from totalQuantity
+    if (!stockItem.batches || stockItem.batches.length === 0) {
+      const newTotalQuantity = Math.max(0, (stockItem.totalQuantity || 0) - quantityNeeded);
+      return {
+        ...stockItem,
+        batches: [],
+        totalQuantity: newTotalQuantity,
+        averageCost: stockItem.averageCost || 0  // Average cost doesn't change
+      };
+    }
+
     if (inventoryMethod === 'FIFO') {
       // FIFO: Deduct from oldest batches first
       let remaining = quantityNeeded;
       const updatedBatches = [];
-      
+
       // Sort batches by date (oldest first)
-      const sortedBatches = [...stockItem.batches].sort((a, b) => 
+      const sortedBatches = [...stockItem.batches].sort((a, b) =>
         new Date(a.date) - new Date(b.date)
       );
-      
+
       for (const batch of sortedBatches) {
         if (remaining <= 0) {
           updatedBatches.push(batch);
@@ -92,12 +113,12 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
           remaining = 0;
         }
       }
-      
+
       // Recalculate totals
       const totalQuantity = updatedBatches.reduce((sum, batch) => sum + batch.quantity, 0);
       const totalCost = updatedBatches.reduce((sum, batch) => sum + (batch.quantity * batch.unitCost), 0);
-      const averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
-      
+      const averageCost = totalQuantity > 0 ? totalCost / totalQuantity : stockItem.averageCost || 0;
+
       return {
         ...stockItem,
         batches: updatedBatches,
@@ -106,19 +127,20 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
       };
     } else {
       // Weighted Average: Proportionally reduce all batches
-      const reductionRatio = (stockItem.totalQuantity - quantityNeeded) / stockItem.totalQuantity;
+      const currentQty = stockItem.totalQuantity || 0;
+      const newTotalQuantity = Math.max(0, currentQty - quantityNeeded);
+      const reductionRatio = currentQty > 0 ? newTotalQuantity / currentQty : 0;
+
       const updatedBatches = stockItem.batches.map(batch => ({
         ...batch,
         quantity: Math.round(batch.quantity * reductionRatio * 100) / 100
       })).filter(batch => batch.quantity > 0);
-      
-      const totalQuantity = stockItem.totalQuantity - quantityNeeded;
-      
+
       return {
         ...stockItem,
         batches: updatedBatches,
-        totalQuantity,
-        averageCost: stockItem.averageCost // Average cost doesn't change
+        totalQuantity: newTotalQuantity,
+        averageCost: stockItem.averageCost || 0  // Average cost doesn't change
       };
     }
   };
@@ -189,7 +211,13 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
     });
   };
 
-  const saveJobCard = () => {
+  const saveJobCard = async () => {
+    // Check if user is logged in
+    if (!currentUser?.uid) {
+      alert('Error: User not logged in. Please refresh and try again.');
+      return;
+    }
+
     // Validate stock availability
     for (const item of formData.items) {
       if (item.stockId) {
@@ -203,57 +231,68 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
       }
     }
 
-    // Calculate actual costs and deduct stock
-    const itemsWithCosts = formData.items.map(item => {
-      const stockItem = stock.find(s => s.id === item.stockId);
-      if (stockItem) {
-        const { cost } = calculateItemCost(stockItem, item.quantity);
-        return { ...item, actualCost: cost };
-      }
-      return item;
-    });
-
-    const updatedFormData = {
-      ...formData,
-      items: itemsWithCosts,
-      status: 'completed',
-      costingMethod: inventoryMethod // Save which method was used
-    };
-
-    // Deduct stock and record usage
-    formData.items.forEach(item => {
-      if (item.stockId) {
+    try {
+      // Calculate actual costs and deduct stock
+      const itemsWithCosts = formData.items.map(item => {
         const stockItem = stock.find(s => s.id === item.stockId);
         if (stockItem) {
-          const updatedStock = deductStock(stockItem, item.quantity);
+          const { cost } = calculateItemCost(stockItem, item.quantity);
+          return { ...item, actualCost: cost };
+        }
+        return item;
+      });
 
-          // Add usage history
-          const usageRecord = {
-            date: formData.date,
-            quantity: item.quantity,
-            cost: calculateItemCost(stockItem, item.quantity).cost,
-            jobCardTitle: formData.title,
-            assetName: assets.find(a => a.id === formData.assetId)?.name || 'Unknown'
-          };
-          
-          // Initialize usageHistory if it doesn't exist
-          if (!updatedStock.usageHistory) {
-            updatedStock.usageHistory = [];
+      const updatedFormData = {
+        ...formData,
+        items: itemsWithCosts,
+        status: 'completed',
+        costingMethod: inventoryMethod // Save which method was used
+      };
+
+      // Deduct stock and record usage
+      for (const item of formData.items) {
+        if (item.stockId) {
+          const stockItem = stock.find(s => s.id === item.stockId);
+          if (stockItem) {
+            const updatedStock = deductStock(stockItem, item.quantity);
+            const usageCost = calculateItemCost(stockItem, item.quantity).cost;
+
+            // Create usage record for local state
+            const usageRecord = {
+              date: formData.date,
+              quantity: item.quantity,
+              cost: usageCost,
+              jobCardTitle: formData.title,
+              assetName: assets.find(a => a.id === formData.assetId)?.name || 'Unknown'
+            };
+
+            // Initialize usageHistory if it doesn't exist
+            if (!updatedStock.usageHistory) {
+              updatedStock.usageHistory = [];
+            }
+            updatedStock.usageHistory.push(usageRecord);
+
+            // Update stock in Firebase (deducts quantity)
+            await updateStock(stockItem.id, updatedStock);
+
+            // Save usage record to Firebase stock_usage collection
+            console.log('Saving usage record to Firebase:', stockItem.id, usageRecord);
+            await api.addStockUsage(stockItem.id, usageRecord, currentUser.uid);
           }
-          updatedStock.usageHistory.push(usageRecord);
-          
-          updateStock(stockItem.id, updatedStock);
         }
       }
-    });
 
-    if (editingId !== null) {
-      updateJobCard(editingId, updatedFormData);
-      setEditingId(null);
-    } else {
-      addJobCard(updatedFormData);
+      if (editingId !== null) {
+        updateJobCard(editingId, updatedFormData);
+        setEditingId(null);
+      } else {
+        addJobCard(updatedFormData);
+      }
+      resetForm();
+    } catch (error) {
+      console.error('Error saving job card:', error);
+      alert('Error saving job card: ' + error.message);
     }
-    resetForm();
   };
 
   const calculateTotal = () => {

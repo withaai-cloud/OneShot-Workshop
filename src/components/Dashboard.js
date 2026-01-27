@@ -61,6 +61,7 @@ function Dashboard({
               assets={assets}
               currency={currency}
               inventoryMethod={inventoryMethod}
+              currentUser={currentUser}
             />
           } />
           <Route path="/assets" element={

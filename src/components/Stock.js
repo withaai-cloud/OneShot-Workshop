@@ -165,7 +165,15 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
         console.log('Processing item:', item.name || item.stockId, 'qty:', item.quantity);
 
         if (item.stockId === 'new') {
-          // Create new stock item WITHOUT batches array (let Firebase handle it)
+          // Create new stock item with batch included
+          const newBatch = {
+            batchId: Date.now().toString(),
+            date: invoiceData.invoiceDate,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            invoiceNumber: invoiceData.invoiceNumber
+          };
+
           const newItem = {
             name: item.name,
             description: item.description,
@@ -173,7 +181,9 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
             category: item.category,
             supplierId: invoiceData.supplierId,
             totalQuantity: item.quantity,
-            averageCost: item.unitCost
+            averageCost: item.unitCost,
+            batches: [newBatch],  // Include batch in local state
+            usageHistory: []
           };
 
           // Add stock item to Firebase
@@ -199,10 +209,20 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
             const newValue = item.quantity * item.unitCost;
             const newAverageCost = newQuantity > 0 ? (existingValue + newValue) / newQuantity : 0;
 
+            // Create new batch for local state
+            const newBatch = {
+              batchId: Date.now().toString(),
+              date: invoiceData.invoiceDate,
+              quantity: item.quantity,
+              unitCost: item.unitCost,
+              invoiceNumber: invoiceData.invoiceNumber
+            };
+
             const updatedItem = {
               ...existingItem,
               totalQuantity: newQuantity,
-              averageCost: newAverageCost
+              averageCost: newAverageCost,
+              batches: [...(existingItem.batches || []), newBatch]  // Add batch to local state
             };
 
             // Update stock totals in Firebase
