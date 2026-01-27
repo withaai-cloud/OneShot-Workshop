@@ -3,7 +3,7 @@ import { Plus, Trash2, Search, ChevronDown, ChevronUp, History, FileText } from 
 import PurchaseInvoice from './PurchaseInvoice';
 import * as api from '../lib/firebaseApi';
 
-function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers, currentUser }) {
+function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers, currentUser, refreshData }) {
   const [isAdding, setIsAdding] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -242,6 +242,11 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
       }
 
       alert(`Invoice saved successfully! ${invoiceData.items.length} items processed.`);
+
+      // Refresh data to load batches from Firebase
+      if (refreshData) {
+        refreshData();
+      }
     } catch (error) {
       console.error('Error saving invoice:', error);
       alert('Error saving invoice: ' + error.message);

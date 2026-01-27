@@ -48,6 +48,7 @@ function Dashboard({
               currency={currency}
               suppliers={suppliers}
               currentUser={currentUser}
+              refreshData={refreshData}
             />
           } />
           <Route path="/job-cards" element={
