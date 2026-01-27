@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Save, Eye, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, Eye, FileText, Search } from 'lucide-react';
 import * as api from '../lib/firebaseApi';
 
 function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, updateStock, assets, currency, inventoryMethod, currentUser }) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [viewingId, setViewingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     assetId: '',
@@ -322,6 +323,20 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
 
   const viewingJobCard = jobCards.find(jc => jc.id === viewingId);
 
+  // Filter job cards based on search term
+  const filteredJobCards = jobCards.filter(jc => {
+    const assetName = assets.find(a => a.id === jc.assetId)?.name || '';
+    return jc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      jc.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      jc.status.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  // Calculate total cost of all completed job cards
+  const totalCost = jobCards
+    .filter(jc => jc.status === 'completed')
+    .reduce((sum, jc) => sum + getJobCardTotal(jc), 0);
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -349,6 +364,20 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
           <h3>Draft</h3>
           <p className="stat-value">{jobCards.filter(jc => jc.status === 'draft').length}</p>
         </div>
+        <div className="stat-box">
+          <h3>Total Cost</h3>
+          <p className="stat-value">{getCurrencySymbol()}{totalCost.toFixed(2)}</p>
+        </div>
+      </div>
+
+      <div className="search-bar">
+        <Search size={20} />
+        <input
+          type="text"
+          placeholder="Search job cards..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {isCreating && (
@@ -563,12 +592,12 @@ function JobCards({ jobCards, addJobCard, updateJobCard, deleteJobCard, stock, u
       )}
 
       <div className="list-container">
-        {jobCards.length === 0 ? (
+        {filteredJobCards.length === 0 ? (
           <div className="empty-list">
-            <p>No job cards yet. Create your first job card to track workshop expenses!</p>
+            <p>{searchTerm ? 'No job cards match your search' : 'No job cards yet. Create your first job card to track workshop expenses!'}</p>
           </div>
         ) : (
-          jobCards.map(jc => (
+          filteredJobCards.map(jc => (
             <div key={jc.id} className="list-item">
               <div className="list-item-main">
                 <div className="list-item-icon">

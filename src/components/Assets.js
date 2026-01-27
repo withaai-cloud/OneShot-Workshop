@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Truck } from 'lucide-react';
+import { Plus, Edit2, Trash2, Truck, Search } from 'lucide-react';
 
 function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     type: 'Vehicle',
@@ -94,6 +95,15 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
     };
   };
 
+  // Filter assets based on search term
+  const filteredAssets = assets.filter(asset =>
+    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (asset.registrationNumber && asset.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (asset.make && asset.make.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (asset.model && asset.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    asset.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -120,6 +130,16 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
           <h3>Implements</h3>
           <p className="stat-value">{assets.filter(a => a.type === 'Implement').length}</p>
         </div>
+      </div>
+
+      <div className="search-bar">
+        <Search size={20} />
+        <input
+          type="text"
+          placeholder="Search assets..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {isAdding && (
@@ -207,12 +227,12 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
       )}
 
       <div className="list-container">
-        {assets.length === 0 ? (
+        {filteredAssets.length === 0 ? (
           <div className="empty-list">
-            <p>No assets yet. Add your first vehicle, trailer, or implement to start tracking expenses!</p>
+            <p>{searchTerm ? 'No assets match your search' : 'No assets yet. Add your first vehicle, trailer, or implement to start tracking expenses!'}</p>
           </div>
         ) : (
-          assets.map(asset => {
+          filteredAssets.map(asset => {
             const stats = getAssetStats(asset.id);
             return (
               <div key={asset.id} className="list-item">

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Building2, TrendingUp, Package } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, TrendingUp, Package, Search } from 'lucide-react';
 
 function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, stock, currency }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [viewingId, setViewingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     contactPerson: '',
@@ -105,6 +106,14 @@ function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, sto
   const viewingSupplier = suppliers.find(s => s.id === viewingId);
   const supplierStock = viewingSupplier ? stock.filter(item => item.supplierId === viewingId) : [];
 
+  // Filter suppliers based on search term
+  const filteredSuppliers = suppliers.filter(supplier =>
+    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (supplier.contactPerson && supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (supplier.email && supplier.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (supplier.phone && supplier.phone.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -132,6 +141,16 @@ function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, sto
             return sum + ((item.quantity || 0) * (item.unitCost || 0));
           }, 0).toFixed(2)}</p>
         </div>
+      </div>
+
+      <div className="search-bar">
+        <Search size={20} />
+        <input
+          type="text"
+          placeholder="Search suppliers..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {isAdding && (
@@ -318,12 +337,12 @@ function Suppliers({ suppliers, addSupplier, updateSupplier, deleteSupplier, sto
       )}
 
       <div className="list-container">
-        {suppliers.length === 0 ? (
+        {filteredSuppliers.length === 0 ? (
           <div className="empty-list">
-            <p>No suppliers yet. Add your first supplier to start tracking purchases!</p>
+            <p>{searchTerm ? 'No suppliers match your search' : 'No suppliers yet. Add your first supplier to start tracking purchases!'}</p>
           </div>
         ) : (
-          suppliers.map(supplier => {
+          filteredSuppliers.map(supplier => {
             const stats = getSupplierStats(supplier.id);
             return (
               <div key={supplier.id} className="list-item">
