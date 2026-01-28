@@ -233,50 +233,66 @@ export const fetchStock = async (userId) => {
     const stockId = docSnap.id;
 
     // Fetch batches for this stock item
-    const batchesQuery = query(
-      collection(db, 'stock_batches'),
-      where('stock_id', '==', stockId),
-      orderBy('created_at')
-    );
-    const batchesSnapshot = await getDocs(batchesQuery);
-    const batches = batchesSnapshot.docs.map(b => ({
-      batchId: b.id,
-      date: b.data().purchase_date,
-      quantity: parseFloat(b.data().quantity),
-      unitCost: parseFloat(b.data().unit_cost),
-      invoiceNumber: b.data().invoice_number
-    }));
+    let batches = [];
+    try {
+      const batchesQuery = query(
+        collection(db, 'stock_batches'),
+        where('stock_id', '==', stockId),
+        orderBy('created_at')
+      );
+      const batchesSnapshot = await getDocs(batchesQuery);
+      batches = batchesSnapshot.docs.map(b => ({
+        batchId: b.id,
+        date: b.data().purchase_date,
+        quantity: parseFloat(b.data().quantity),
+        unitCost: parseFloat(b.data().unit_cost),
+        invoiceNumber: b.data().invoice_number
+      }));
+      console.log(`Loaded ${batches.length} batches for stock ${stockId} (${stockData.name})`);
+    } catch (err) {
+      console.error(`Error loading batches for stock ${stockId}:`, err);
+    }
 
     // Fetch usage history for this stock item
-    const usageQuery = query(
-      collection(db, 'stock_usage'),
-      where('stock_id', '==', stockId),
-      orderBy('created_at')
-    );
-    const usageSnapshot = await getDocs(usageQuery);
-    const usageHistory = usageSnapshot.docs.map(u => ({
-      date: u.data().usage_date,
-      quantity: parseFloat(u.data().quantity),
-      cost: parseFloat(u.data().cost),
-      jobCardTitle: u.data().job_card_title,
-      assetName: u.data().asset_name
-    }));
+    let usageHistory = [];
+    try {
+      const usageQuery = query(
+        collection(db, 'stock_usage'),
+        where('stock_id', '==', stockId),
+        orderBy('created_at')
+      );
+      const usageSnapshot = await getDocs(usageQuery);
+      usageHistory = usageSnapshot.docs.map(u => ({
+        date: u.data().usage_date,
+        quantity: parseFloat(u.data().quantity),
+        cost: parseFloat(u.data().cost),
+        jobCardTitle: u.data().job_card_title,
+        assetName: u.data().asset_name
+      }));
+    } catch (err) {
+      console.error(`Error loading usage for stock ${stockId}:`, err);
+    }
 
     // Fetch writeoffs for this stock item
-    const writeoffsQuery = query(
-      collection(db, 'stock_writeoffs'),
-      where('stock_id', '==', stockId),
-      orderBy('created_at')
-    );
-    const writeoffsSnapshot = await getDocs(writeoffsQuery);
-    const writeoffs = writeoffsSnapshot.docs.map(w => ({
-      id: w.id,
-      date: w.data().writeoff_date,
-      quantity: parseFloat(w.data().quantity),
-      cost: parseFloat(w.data().cost),
-      reason: w.data().reason,
-      notes: w.data().notes || ''
-    }));
+    let writeoffs = [];
+    try {
+      const writeoffsQuery = query(
+        collection(db, 'stock_writeoffs'),
+        where('stock_id', '==', stockId),
+        orderBy('created_at')
+      );
+      const writeoffsSnapshot = await getDocs(writeoffsQuery);
+      writeoffs = writeoffsSnapshot.docs.map(w => ({
+        id: w.id,
+        date: w.data().writeoff_date,
+        quantity: parseFloat(w.data().quantity),
+        cost: parseFloat(w.data().cost),
+        reason: w.data().reason,
+        notes: w.data().notes || ''
+      }));
+    } catch (err) {
+      console.error(`Error loading writeoffs for stock ${stockId}:`, err);
+    }
 
     stockItems.push({
       id: stockId,
@@ -372,6 +388,7 @@ export const deleteStock = async (stockId) => {
 // ==================== STOCK BATCHES ====================
 
 export const addStockBatch = async (stockId, batchData, userId) => {
+  console.log('Creating batch for stock_id:', stockId, 'data:', batchData);
   const docRef = doc(collection(db, 'stock_batches'));
   const data = {
     stock_id: stockId,
@@ -383,6 +400,7 @@ export const addStockBatch = async (stockId, batchData, userId) => {
     created_at: new Date().toISOString()
   };
   await setDoc(docRef, data);
+  console.log('Batch created with id:', docRef.id);
 
   return {
     batchId: docRef.id,
