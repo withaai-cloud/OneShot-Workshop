@@ -24,6 +24,7 @@ function App() {
   const [suppliers, setSuppliers] = useState([]);
   const [currency, setCurrency] = useState('ZAR');
   const [inventoryMethod, setInventoryMethod] = useState('FIFO');
+  const [categories, setCategories] = useState(['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
 
   // Sync with Firebase in background (doesn't block UI)
   const syncInBackground = useCallback(async (userId) => {
@@ -38,6 +39,7 @@ function App() {
       setSuppliers(data.suppliers || []);
       setCurrency(data.settings?.currency || 'ZAR');
       setInventoryMethod(data.settings?.inventoryMethod || 'FIFO');
+      setCategories(data.settings?.categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
 
       // Update cache
       cache.setCachedData(userId, data);
@@ -62,6 +64,7 @@ function App() {
         setSuppliers(cachedData.suppliers);
         setCurrency(cachedData.settings?.currency || 'ZAR');
         setInventoryMethod(cachedData.settings?.inventoryMethod || 'FIFO');
+        setCategories(cachedData.settings?.categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
         setLoadedFromCache(true);
         
         // Sync in background (don't block UI)
@@ -86,6 +89,7 @@ function App() {
       setSuppliers(data.suppliers || []);
       setCurrency(data.settings?.currency || 'ZAR');
       setInventoryMethod(data.settings?.inventoryMethod || 'FIFO');
+      setCategories(data.settings?.categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
 
       // Save to cache
       cache.setCachedData(userId, data);
@@ -117,6 +121,7 @@ function App() {
           setSuppliers([]);
           setCurrency('ZAR');
           setInventoryMethod('FIFO');
+          setCategories(['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
           cache.clearCache();
         }
         
@@ -310,11 +315,22 @@ function App() {
 
   const handleSetInventoryMethod = async (newMethod) => {
     try {
-      await api.updateSettings(currentUser.uid, { currency, inventoryMethod: newMethod });
+      await api.updateSettings(currentUser.uid, { currency, inventoryMethod: newMethod, categories });
       setInventoryMethod(newMethod);
       cache.invalidateCache();
     } catch (err) {
       console.error('Error updating inventory method:', err);
+      throw err;
+    }
+  };
+
+  const handleSetCategories = async (newCategories) => {
+    try {
+      await api.updateSettings(currentUser.uid, { currency, inventoryMethod, categories: newCategories });
+      setCategories(newCategories);
+      cache.invalidateCache();
+    } catch (err) {
+      console.error('Error updating categories:', err);
       throw err;
     }
   };
@@ -397,6 +413,8 @@ function App() {
                 setCurrency={handleSetCurrency}
                 inventoryMethod={inventoryMethod}
                 setInventoryMethod={handleSetInventoryMethod}
+                categories={categories}
+                setCategories={handleSetCategories}
                 currentUser={currentUser}
                 onLogout={handleLogout}
                 refreshData={refreshData}

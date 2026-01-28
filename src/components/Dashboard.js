@@ -16,6 +16,7 @@ function Dashboard({
   suppliers, addSupplier, updateSupplier, deleteSupplier,
   currency, setCurrency,
   inventoryMethod, setInventoryMethod,
+  categories, setCategories,
   currentUser,
   onLogout,
   refreshData,
@@ -49,6 +50,8 @@ function Dashboard({
               suppliers={suppliers}
               currentUser={currentUser}
               refreshData={refreshData}
+              inventoryMethod={inventoryMethod}
+              categories={categories}
             />
           } />
           <Route path="/job-cards" element={
@@ -99,6 +102,9 @@ function Dashboard({
               setCurrency={setCurrency}
               inventoryMethod={inventoryMethod}
               setInventoryMethod={setInventoryMethod}
+              categories={categories}
+              setCategories={setCategories}
+              stock={stock}
               currentUser={currentUser}
             />
           } />

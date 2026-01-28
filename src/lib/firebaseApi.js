@@ -104,6 +104,8 @@ export const updateProfileData = async (userId, updates) => {
 
 // ==================== SETTINGS ====================
 
+const DEFAULT_CATEGORIES = ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
+
 export const getSettings = async (userId) => {
   const docRef = doc(db, 'settings', userId);
   const docSnap = await getDoc(docRef);
@@ -112,11 +114,12 @@ export const getSettings = async (userId) => {
     const data = docSnap.data();
     return {
       currency: data.currency || 'ZAR',
-      inventoryMethod: data.inventory_method || 'FIFO'
+      inventoryMethod: data.inventory_method || 'FIFO',
+      categories: data.categories || DEFAULT_CATEGORIES
     };
   }
   // Return defaults if not found
-  return { currency: 'ZAR', inventoryMethod: 'FIFO' };
+  return { currency: 'ZAR', inventoryMethod: 'FIFO', categories: DEFAULT_CATEGORIES };
 };
 
 export const updateSettings = async (userId, updates) => {
@@ -124,14 +127,16 @@ export const updateSettings = async (userId, updates) => {
   const dbUpdates = {
     user_id: userId,
     currency: updates.currency,
-    inventory_method: updates.inventoryMethod
+    inventory_method: updates.inventoryMethod,
+    categories: updates.categories || DEFAULT_CATEGORIES
   };
   await setDoc(docRef, dbUpdates, { merge: true });
 
   // Return transformed data (camelCase)
   return {
     currency: updates.currency,
-    inventoryMethod: updates.inventoryMethod
+    inventoryMethod: updates.inventoryMethod,
+    categories: updates.categories || DEFAULT_CATEGORIES
   };
 };
 
@@ -257,6 +262,22 @@ export const fetchStock = async (userId) => {
       assetName: u.data().asset_name
     }));
 
+    // Fetch writeoffs for this stock item
+    const writeoffsQuery = query(
+      collection(db, 'stock_writeoffs'),
+      where('stock_id', '==', stockId),
+      orderBy('created_at')
+    );
+    const writeoffsSnapshot = await getDocs(writeoffsQuery);
+    const writeoffs = writeoffsSnapshot.docs.map(w => ({
+      id: w.id,
+      date: w.data().writeoff_date,
+      quantity: parseFloat(w.data().quantity),
+      cost: parseFloat(w.data().cost),
+      reason: w.data().reason,
+      notes: w.data().notes || ''
+    }));
+
     stockItems.push({
       id: stockId,
       name: stockData.name,
@@ -267,7 +288,8 @@ export const fetchStock = async (userId) => {
       totalQuantity: parseFloat(stockData.total_quantity) || 0,
       averageCost: parseFloat(stockData.average_cost) || 0,
       batches,
-      usageHistory
+      usageHistory,
+      writeoffs
     });
   }
 
@@ -394,6 +416,51 @@ export const addStockUsage = async (stockId, usageData, userId) => {
     jobCardTitle: usageData.jobCardTitle,
     assetName: usageData.assetName || ''
   };
+};
+
+export const addStockWriteoff = async (stockId, writeoffData, userId) => {
+  const docRef = doc(collection(db, 'stock_writeoffs'));
+  const data = {
+    stock_id: stockId,
+    user_id: userId,
+    writeoff_date: writeoffData.date,
+    quantity: writeoffData.quantity,
+    cost: writeoffData.cost,
+    reason: writeoffData.reason,
+    notes: writeoffData.notes || '',
+    created_at: new Date().toISOString()
+  };
+  await setDoc(docRef, data);
+
+  return {
+    id: docRef.id,
+    date: writeoffData.date,
+    quantity: parseFloat(writeoffData.quantity) || 0,
+    cost: parseFloat(writeoffData.cost) || 0,
+    reason: writeoffData.reason,
+    notes: writeoffData.notes || ''
+  };
+};
+
+export const fetchStockWriteoffs = async (stockId) => {
+  const q = query(
+    collection(db, 'stock_writeoffs'),
+    where('stock_id', '==', stockId),
+    orderBy('writeoff_date', 'desc')
+  );
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      date: data.writeoff_date,
+      quantity: parseFloat(data.quantity) || 0,
+      cost: parseFloat(data.cost) || 0,
+      reason: data.reason,
+      notes: data.notes || ''
+    };
+  });
 };
 
 // ==================== ASSETS ====================

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Save, X } from 'lucide-react';
 
-function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency }) {
+function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency, categories }) {
   const [invoiceData, setInvoiceData] = useState({
     supplierId: '',
     invoiceNumber: '',
@@ -10,7 +10,8 @@ function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency }) {
     items: []
   });
 
-  const categories = ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
+  // Use categories from props, fallback to defaults if not provided
+  const invoiceCategories = categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
 
   const getCurrencySymbol = () => {
     const symbols = {
@@ -239,7 +240,7 @@ function PurchaseInvoice({ onClose, onSave, stock, suppliers, currency }) {
                             className="invoice-select"
                             disabled={item.stockId !== 'new'}
                           >
-                            {categories.map(cat => (
+                            {invoiceCategories.map(cat => (
                               <option key={cat} value={cat}>{cat}</option>
                             ))}
                           </select>

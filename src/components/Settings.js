@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { Globe, Info, Package, Loader } from 'lucide-react';
+import { Globe, Info, Package, Loader, Tag, Plus, Edit2, Trash2, X, Check } from 'lucide-react';
 import * as api from '../lib/firebaseApi';
 
-function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, currentUser }) {
+const DEFAULT_CATEGORIES = ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
+
+function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, categories, setCategories, stock, currentUser }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editCategoryValue, setEditCategoryValue] = useState('');
 
   const currencies = [
     { code: 'ZAR', name: 'South African Rand (R)', symbol: 'R' },
@@ -107,6 +112,99 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
     e.target.value = ''; // Reset input
   };
 
+  // Category management handlers
+  const handleAddCategory = async () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) {
+      setError('Please enter a category name');
+      return;
+    }
+    if (categories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This category already exists');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const updatedCategories = [...categories, trimmed];
+      await setCategories(updatedCategories);
+      setNewCategory('');
+      setSuccess('Category added successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to add category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditCategory = async (oldName) => {
+    const trimmed = editCategoryValue.trim();
+    if (!trimmed) {
+      setError('Please enter a category name');
+      return;
+    }
+    if (trimmed !== oldName && categories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This category already exists');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const updatedCategories = categories.map(c => c === oldName ? trimmed : c);
+      await setCategories(updatedCategories);
+      setEditingCategory(null);
+      setEditCategoryValue('');
+      setSuccess('Category updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to update category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryName) => {
+    if (DEFAULT_CATEGORIES.includes(categoryName)) {
+      setError('Cannot delete default categories');
+      return;
+    }
+
+    // Check if category is in use
+    const inUse = stock && stock.some(item => item.category === categoryName);
+    if (inUse) {
+      setError(`Cannot delete "${categoryName}" - it is being used by stock items`);
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete the category "${categoryName}"?`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    try {
+      const updatedCategories = categories.filter(c => c !== categoryName);
+      await setCategories(updatedCategories);
+      setSuccess('Category deleted successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to delete category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startEditCategory = (categoryName) => {
+    setEditingCategory(categoryName);
+    setEditCategoryValue(categoryName);
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCategory(null);
+    setEditCategoryValue('');
+  };
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -187,6 +285,94 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
                   This method smooths out price fluctuations and is simpler for accounting purposes.
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="section-header">
+            <Tag size={24} />
+            <h3>Stock Categories</h3>
+          </div>
+          <div className="form-group">
+            <p className="helper-text" style={{ marginBottom: '1rem' }}>
+              Manage categories for organizing your stock items. Default categories cannot be deleted.
+            </p>
+
+            <div className="category-list">
+              {categories && categories.map(category => (
+                <div key={category} className="category-item">
+                  {editingCategory === category ? (
+                    <div className="category-edit">
+                      <input
+                        type="text"
+                        value={editCategoryValue}
+                        onChange={(e) => setEditCategoryValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleEditCategory(category);
+                          if (e.key === 'Escape') cancelEditCategory();
+                        }}
+                        autoFocus
+                      />
+                      <button className="icon-btn success" onClick={() => handleEditCategory(category)} title="Save">
+                        <Check size={16} />
+                      </button>
+                      <button className="icon-btn" onClick={cancelEditCategory} title="Cancel">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="category-name">
+                        {category}
+                        {DEFAULT_CATEGORIES.includes(category) && (
+                          <span className="default-badge">Default</span>
+                        )}
+                      </span>
+                      <div className="category-actions">
+                        {!DEFAULT_CATEGORIES.includes(category) && (
+                          <>
+                            <button
+                              className="icon-btn"
+                              onClick={() => startEditCategory(category)}
+                              title="Edit"
+                              disabled={isLoading}
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              className="icon-btn danger"
+                              onClick={() => handleDeleteCategory(category)}
+                              title="Delete"
+                              disabled={isLoading}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="add-category-form">
+              <input
+                type="text"
+                placeholder="New category name..."
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                disabled={isLoading}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleAddCategory}
+                disabled={isLoading || !newCategory.trim()}
+              >
+                <Plus size={16} /> Add Category
+              </button>
             </div>
           </div>
         </div>

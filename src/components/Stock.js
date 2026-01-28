@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Search, ChevronDown, ChevronUp, History, FileText } from 'lucide-react';
+import { Plus, Trash2, Search, ChevronDown, ChevronUp, History, FileText, AlertTriangle } from 'lucide-react';
 import PurchaseInvoice from './PurchaseInvoice';
 import * as api from '../lib/firebaseApi';
 
-function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers, currentUser, refreshData }) {
+function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers, currentUser, refreshData, inventoryMethod, categories }) {
   const [isAdding, setIsAdding] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [showWriteoff, setShowWriteoff] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedItems, setExpandedItems] = useState({});
+  const [writeoffData, setWriteoffData] = useState({
+    stockId: '',
+    quantity: 0,
+    reason: 'Damaged',
+    notes: '',
+    date: new Date().toISOString().split('T')[0]
+  });
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -20,7 +28,8 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
     purchaseDate: new Date().toISOString().split('T')[0]
   });
 
-  const categories = ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
+  // Use categories from props, fallback to defaults if not provided
+  const stockCategories = categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
 
   const getCurrencySymbol = () => {
     const symbols = {
@@ -260,6 +269,128 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
     }));
   };
 
+  // Calculate write-off cost based on inventory method
+  const calculateWriteoffCost = (stockItem, quantity) => {
+    if (!stockItem) return 0;
+
+    // If no batches or using weighted average, use average cost
+    if (!stockItem.batches || stockItem.batches.length === 0 || inventoryMethod !== 'FIFO') {
+      return quantity * (stockItem.averageCost || 0);
+    }
+
+    // FIFO: Calculate from oldest batches
+    let remaining = quantity;
+    let totalCost = 0;
+    const sortedBatches = [...stockItem.batches].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    for (const batch of sortedBatches) {
+      if (remaining <= 0) break;
+      const qtyFromBatch = Math.min(batch.quantity, remaining);
+      totalCost += qtyFromBatch * batch.unitCost;
+      remaining -= qtyFromBatch;
+    }
+
+    return totalCost;
+  };
+
+  // Handle write-off submission
+  const handleWriteoff = async () => {
+    if (!currentUser?.uid) {
+      alert('Error: User not logged in. Please refresh and try again.');
+      return;
+    }
+
+    const stockItem = stock.find(s => s.id === writeoffData.stockId);
+    if (!stockItem) {
+      alert('Please select a stock item');
+      return;
+    }
+
+    if (writeoffData.quantity <= 0) {
+      alert('Quantity must be greater than 0');
+      return;
+    }
+
+    if (writeoffData.quantity > stockItem.totalQuantity) {
+      alert(`Cannot write off more than available quantity (${stockItem.totalQuantity})`);
+      return;
+    }
+
+    try {
+      const writeoffCost = calculateWriteoffCost(stockItem, writeoffData.quantity);
+
+      // Deduct from stock
+      let updatedBatches = stockItem.batches || [];
+      let newTotalQuantity = stockItem.totalQuantity - writeoffData.quantity;
+
+      if (inventoryMethod === 'FIFO' && updatedBatches.length > 0) {
+        // FIFO: Deduct from oldest batches first
+        let remaining = writeoffData.quantity;
+        const sortedBatches = [...updatedBatches].sort((a, b) => new Date(a.date) - new Date(b.date));
+        updatedBatches = [];
+
+        for (const batch of sortedBatches) {
+          if (remaining <= 0) {
+            updatedBatches.push(batch);
+          } else if (batch.quantity <= remaining) {
+            remaining -= batch.quantity;
+          } else {
+            updatedBatches.push({ ...batch, quantity: batch.quantity - remaining });
+            remaining = 0;
+          }
+        }
+      }
+
+      // Recalculate average cost
+      const totalValue = updatedBatches.reduce((sum, b) => sum + (b.quantity * b.unitCost), 0);
+      const newAvgCost = newTotalQuantity > 0 ? totalValue / newTotalQuantity : stockItem.averageCost;
+
+      // Create writeoff record for local state
+      const writeoffRecord = {
+        date: writeoffData.date,
+        quantity: writeoffData.quantity,
+        cost: writeoffCost,
+        reason: writeoffData.reason,
+        notes: writeoffData.notes
+      };
+
+      const updatedStock = {
+        ...stockItem,
+        batches: updatedBatches,
+        totalQuantity: newTotalQuantity,
+        averageCost: newAvgCost,
+        writeoffs: [...(stockItem.writeoffs || []), writeoffRecord]
+      };
+
+      // Update stock in Firebase
+      await updateStock(stockItem.id, updatedStock);
+
+      // Save writeoff record to Firebase
+      await api.addStockWriteoff(stockItem.id, writeoffRecord, currentUser.uid);
+
+      // Reset form and close modal
+      setWriteoffData({
+        stockId: '',
+        quantity: 0,
+        reason: 'Damaged',
+        notes: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+      setShowWriteoff(false);
+
+      alert(`Successfully wrote off ${writeoffData.quantity} units`);
+
+      if (refreshData) {
+        refreshData();
+      }
+    } catch (error) {
+      console.error('Error processing write-off:', error);
+      alert('Error processing write-off: ' + error.message);
+    }
+  };
+
+  const selectedWriteoffStock = stock.find(s => s.id === writeoffData.stockId);
+
   const filteredStock = stock.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (item.partNumber && item.partNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -278,8 +409,8 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
           <button className="btn btn-primary" onClick={() => setShowInvoice(true)}>
             <FileText size={20} /> New Purchase Invoice
           </button>
-          <button className="btn btn-secondary" onClick={() => setIsAdding(true)}>
-            <Plus size={20} /> Quick Add
+          <button className="btn btn-danger" onClick={() => setShowWriteoff(true)}>
+            <AlertTriangle size={20} /> Write Off
           </button>
         </div>
       </div>
@@ -306,6 +437,7 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
           stock={stock}
           suppliers={suppliers}
           currency={currency}
+          categories={stockCategories}
         />
       )}
 
@@ -345,7 +477,7 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
                     required
                     disabled={editingId !== null}
                   >
-                    {categories.map(cat => (
+                    {stockCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -413,6 +545,115 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showWriteoff && (
+        <div className="modal-overlay" onClick={() => setShowWriteoff(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3><AlertTriangle size={20} /> Write Off Stock</h3>
+              <button className="close-btn" onClick={() => setShowWriteoff(false)}>×</button>
+            </div>
+            <div className="form-grid">
+              <div className="form-group full-width">
+                <label>Select Stock Item *</label>
+                <select
+                  value={writeoffData.stockId}
+                  onChange={(e) => setWriteoffData({ ...writeoffData, stockId: e.target.value, quantity: 0 })}
+                  required
+                >
+                  <option value="">Select item...</option>
+                  {stock.filter(s => s.totalQuantity > 0).map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} (Available: {item.totalQuantity})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedWriteoffStock && (
+                <>
+                  <div className="form-group">
+                    <label>Available Quantity</label>
+                    <input type="text" value={selectedWriteoffStock.totalQuantity} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label>Current Avg Cost</label>
+                    <input type="text" value={`${getCurrencySymbol()}${selectedWriteoffStock.averageCost.toFixed(2)}`} disabled />
+                  </div>
+                </>
+              )}
+
+              <div className="form-group">
+                <label>Quantity to Write Off *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedWriteoffStock?.totalQuantity || 0}
+                  value={writeoffData.quantity}
+                  onChange={(e) => setWriteoffData({ ...writeoffData, quantity: parseInt(e.target.value) || 0 })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Date *</label>
+                <input
+                  type="date"
+                  value={writeoffData.date}
+                  onChange={(e) => setWriteoffData({ ...writeoffData, date: e.target.value })}
+                  required
+                />
+              </div>
+
+              {selectedWriteoffStock && writeoffData.quantity > 0 && (
+                <div className="form-group full-width">
+                  <label>Calculated Write-off Value</label>
+                  <input
+                    type="text"
+                    value={`${getCurrencySymbol()}${calculateWriteoffCost(selectedWriteoffStock, writeoffData.quantity).toFixed(2)}`}
+                    disabled
+                    className="writeoff-value"
+                  />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Reason *</label>
+                <select
+                  value={writeoffData.reason}
+                  onChange={(e) => setWriteoffData({ ...writeoffData, reason: e.target.value })}
+                  required
+                >
+                  <option value="Damaged">Damaged</option>
+                  <option value="Stolen">Stolen</option>
+                  <option value="Consumed">Consumed</option>
+                </select>
+              </div>
+              <div className="form-group full-width">
+                <label>Notes (Optional)</label>
+                <textarea
+                  value={writeoffData.notes}
+                  onChange={(e) => setWriteoffData({ ...writeoffData, notes: e.target.value })}
+                  rows="2"
+                  placeholder="Additional details about the write-off..."
+                />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowWriteoff(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleWriteoff}
+                disabled={!writeoffData.stockId || writeoffData.quantity <= 0}
+              >
+                Confirm Write-off
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -556,6 +797,35 @@ function Stock({ stock, addStock, updateStock, deleteStock, currency, suppliers,
                                       <td>{getCurrencySymbol()}{usage.cost.toFixed(2)}</td>
                                       <td>{usage.jobCardTitle}</td>
                                       <td>{usage.assetName || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Write-offs History */}
+                          {item.writeoffs && item.writeoffs.length > 0 && (
+                            <div className="history-section">
+                              <h5>Write-offs (Last 10)</h5>
+                              <table className="batch-table">
+                                <thead>
+                                  <tr>
+                                    <th>Date</th>
+                                    <th>Reason</th>
+                                    <th>Quantity</th>
+                                    <th>Cost</th>
+                                    <th>Notes</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {item.writeoffs.slice(-10).reverse().map((writeoff, index) => (
+                                    <tr key={index} className="writeoff-row">
+                                      <td>{new Date(writeoff.date).toLocaleDateString()}</td>
+                                      <td><span className={`transaction-badge writeoff ${writeoff.reason.toLowerCase()}`}>{writeoff.reason}</span></td>
+                                      <td>-{writeoff.quantity}</td>
+                                      <td>{getCurrencySymbol()}{writeoff.cost.toFixed(2)}</td>
+                                      <td>{writeoff.notes || '-'}</td>
                                     </tr>
                                   ))}
                                 </tbody>
