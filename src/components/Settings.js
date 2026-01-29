@@ -407,9 +407,9 @@ function Settings({
 
             <div className="category-list">
               {categories && categories.map(category => (
-                <div key={category} className="category-item">
+                <div key={category} className="category-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
                   {editingCategory === category ? (
-                    <div className="category-edit">
+                    <div className="category-edit" style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
                       <input
                         type="text"
                         value={editCategoryValue}
@@ -419,6 +419,7 @@ function Settings({
                           if (e.key === 'Escape') cancelEditCategory();
                         }}
                         autoFocus
+                        style={{ flex: 1 }}
                       />
                       <button className="icon-btn success" onClick={() => handleEditCategory(category)} title="Save">
                         <Check size={16} />
@@ -430,7 +431,7 @@ function Settings({
                   ) : (
                     <>
                       <span className="category-name">{category}</span>
-                      <div className="category-actions">
+                      <div className="category-actions" style={{ display: 'flex', gap: '0.25rem', marginLeft: 'auto' }}>
                         <button
                           className="icon-btn"
                           onClick={() => startEditCategory(category)}
@@ -486,9 +487,9 @@ function Settings({
 
             <div className="category-list">
               {assetCategories && assetCategories.map(category => (
-                <div key={category} className="category-item">
+                <div key={category} className="category-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
                   {editingAssetCategory === category ? (
-                    <div className="category-edit">
+                    <div className="category-edit" style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
                       <input
                         type="text"
                         value={editAssetCategoryValue}
@@ -498,6 +499,7 @@ function Settings({
                           if (e.key === 'Escape') cancelEditAssetCategory();
                         }}
                         autoFocus
+                        style={{ flex: 1 }}
                       />
                       <button className="icon-btn success" onClick={() => handleEditAssetCategory(category)} title="Save">
                         <Check size={16} />
@@ -509,7 +511,7 @@ function Settings({
                   ) : (
                     <>
                       <span className="category-name">{category}</span>
-                      <div className="category-actions">
+                      <div className="category-actions" style={{ display: 'flex', gap: '0.25rem', marginLeft: 'auto' }}>
                         <button
                           className="icon-btn"
                           onClick={() => startEditAssetCategory(category)}
