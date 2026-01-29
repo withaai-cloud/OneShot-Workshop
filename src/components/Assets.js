@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Truck, Search } from 'lucide-react';
 
-function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency }) {
+const DEFAULT_ASSET_CATEGORIES = ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other'];
+
+function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency, assetCategories = DEFAULT_ASSET_CATEGORIES }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
-    type: 'Vehicle',
+    type: assetCategories[0] || 'Vehicle',
     registrationNumber: '',
     make: '',
     model: '',
     year: '',
     description: ''
   });
-
-  const assetTypes = ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other'];
 
   const getCurrencySymbol = () => {
     const symbols = {
@@ -41,7 +41,7 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
   const resetForm = () => {
     setFormData({
       name: '',
-      type: 'Vehicle',
+      type: assetCategories[0] || 'Vehicle',
       registrationNumber: '',
       make: '',
       model: '',
@@ -118,18 +118,12 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
           <h3>Total Assets</h3>
           <p className="stat-value">{assets.length}</p>
         </div>
-        <div className="stat-box">
-          <h3>Vehicles</h3>
-          <p className="stat-value">{assets.filter(a => a.type === 'Vehicle').length}</p>
-        </div>
-        <div className="stat-box">
-          <h3>Trailers</h3>
-          <p className="stat-value">{assets.filter(a => a.type === 'Trailer').length}</p>
-        </div>
-        <div className="stat-box">
-          <h3>Implements</h3>
-          <p className="stat-value">{assets.filter(a => a.type === 'Implement').length}</p>
-        </div>
+        {assetCategories.slice(0, 3).map(category => (
+          <div key={category} className="stat-box">
+            <h3>{category}s</h3>
+            <p className="stat-value">{assets.filter(a => a.type === category).length}</p>
+          </div>
+        ))}
       </div>
 
       <div className="search-bar">
@@ -167,7 +161,7 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     required
                   >
-                    {assetTypes.map(type => (
+                    {assetCategories.map(type => (
                       <option key={type} value={type}>{type}</option>
                     ))}
                   </select>

@@ -105,6 +105,7 @@ export const updateProfileData = async (userId, updates) => {
 // ==================== SETTINGS ====================
 
 const DEFAULT_CATEGORIES = ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
+const DEFAULT_ASSET_CATEGORIES = ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other'];
 
 export const getSettings = async (userId) => {
   const docRef = doc(db, 'settings', userId);
@@ -115,11 +116,17 @@ export const getSettings = async (userId) => {
     return {
       currency: data.currency || 'ZAR',
       inventoryMethod: data.inventory_method || 'FIFO',
-      categories: data.categories || DEFAULT_CATEGORIES
+      categories: data.categories || DEFAULT_CATEGORIES,
+      assetCategories: data.asset_categories || DEFAULT_ASSET_CATEGORIES
     };
   }
   // Return defaults if not found
-  return { currency: 'ZAR', inventoryMethod: 'FIFO', categories: DEFAULT_CATEGORIES };
+  return {
+    currency: 'ZAR',
+    inventoryMethod: 'FIFO',
+    categories: DEFAULT_CATEGORIES,
+    assetCategories: DEFAULT_ASSET_CATEGORIES
+  };
 };
 
 export const updateSettings = async (userId, updates) => {
@@ -128,7 +135,8 @@ export const updateSettings = async (userId, updates) => {
     user_id: userId,
     currency: updates.currency,
     inventory_method: updates.inventoryMethod,
-    categories: updates.categories || DEFAULT_CATEGORIES
+    categories: updates.categories || DEFAULT_CATEGORIES,
+    asset_categories: updates.assetCategories || DEFAULT_ASSET_CATEGORIES
   };
   await setDoc(docRef, dbUpdates, { merge: true });
 
@@ -136,7 +144,8 @@ export const updateSettings = async (userId, updates) => {
   return {
     currency: updates.currency,
     inventoryMethod: updates.inventoryMethod,
-    categories: updates.categories || DEFAULT_CATEGORIES
+    categories: updates.categories || DEFAULT_CATEGORIES,
+    assetCategories: updates.assetCategories || DEFAULT_ASSET_CATEGORIES
   };
 };
 

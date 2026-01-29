@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
-import { Globe, Info, Package, Loader, Tag, Plus, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Globe, Info, Package, Loader, Tag, Plus, Edit2, Trash2, X, Check, Truck } from 'lucide-react';
 import * as api from '../lib/firebaseApi';
 
-const DEFAULT_CATEGORIES = ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
-
-function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, categories, setCategories, stock, currentUser }) {
+function Settings({
+  currency, setCurrency,
+  inventoryMethod, setInventoryMethod,
+  categories, setCategories,
+  assetCategories, setAssetCategories,
+  stock, assets, currentUser
+}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Stock category state
   const [newCategory, setNewCategory] = useState('');
   const [editingCategory, setEditingCategory] = useState(null);
   const [editCategoryValue, setEditCategoryValue] = useState('');
+
+  // Asset category state
+  const [newAssetCategory, setNewAssetCategory] = useState('');
+  const [editingAssetCategory, setEditingAssetCategory] = useState(null);
+  const [editAssetCategoryValue, setEditAssetCategoryValue] = useState('');
 
   const currencies = [
     { code: 'ZAR', name: 'South African Rand (R)', symbol: 'R' },
@@ -112,7 +123,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
     e.target.value = ''; // Reset input
   };
 
-  // Category management handlers
+  // ==================== STOCK CATEGORY HANDLERS ====================
   const handleAddCategory = async () => {
     const trimmed = newCategory.trim();
     if (!trimmed) {
@@ -129,7 +140,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
       const updatedCategories = [...categories, trimmed];
       await setCategories(updatedCategories);
       setNewCategory('');
-      setSuccess('Category added successfully!');
+      setSuccess('Stock category added successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError('Failed to add category. Please try again.');
@@ -155,7 +166,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
       await setCategories(updatedCategories);
       setEditingCategory(null);
       setEditCategoryValue('');
-      setSuccess('Category updated successfully!');
+      setSuccess('Stock category updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError('Failed to update category. Please try again.');
@@ -165,15 +176,16 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
   };
 
   const handleDeleteCategory = async (categoryName) => {
-    if (DEFAULT_CATEGORIES.includes(categoryName)) {
-      setError('Cannot delete default categories');
-      return;
-    }
-
     // Check if category is in use
     const inUse = stock && stock.some(item => item.category === categoryName);
     if (inUse) {
       setError(`Cannot delete "${categoryName}" - it is being used by stock items`);
+      return;
+    }
+
+    // Prevent deleting the last category
+    if (categories.length <= 1) {
+      setError('Cannot delete the last category. Add another category first.');
       return;
     }
 
@@ -186,7 +198,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
     try {
       const updatedCategories = categories.filter(c => c !== categoryName);
       await setCategories(updatedCategories);
-      setSuccess('Category deleted successfully!');
+      setSuccess('Stock category deleted successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError('Failed to delete category. Please try again.');
@@ -203,6 +215,100 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
   const cancelEditCategory = () => {
     setEditingCategory(null);
     setEditCategoryValue('');
+  };
+
+  // ==================== ASSET CATEGORY HANDLERS ====================
+  const handleAddAssetCategory = async () => {
+    const trimmed = newAssetCategory.trim();
+    if (!trimmed) {
+      setError('Please enter an asset category name');
+      return;
+    }
+    if (assetCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This asset category already exists');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const updatedCategories = [...assetCategories, trimmed];
+      await setAssetCategories(updatedCategories);
+      setNewAssetCategory('');
+      setSuccess('Asset category added successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to add asset category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditAssetCategory = async (oldName) => {
+    const trimmed = editAssetCategoryValue.trim();
+    if (!trimmed) {
+      setError('Please enter an asset category name');
+      return;
+    }
+    if (trimmed !== oldName && assetCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This asset category already exists');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const updatedCategories = assetCategories.map(c => c === oldName ? trimmed : c);
+      await setAssetCategories(updatedCategories);
+      setEditingAssetCategory(null);
+      setEditAssetCategoryValue('');
+      setSuccess('Asset category updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to update asset category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteAssetCategory = async (categoryName) => {
+    // Check if category is in use
+    const inUse = assets && assets.some(item => item.type === categoryName);
+    if (inUse) {
+      setError(`Cannot delete "${categoryName}" - it is being used by assets`);
+      return;
+    }
+
+    // Prevent deleting the last category
+    if (assetCategories.length <= 1) {
+      setError('Cannot delete the last asset category. Add another category first.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete the asset category "${categoryName}"?`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    try {
+      const updatedCategories = assetCategories.filter(c => c !== categoryName);
+      await setAssetCategories(updatedCategories);
+      setSuccess('Asset category deleted successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to delete asset category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startEditAssetCategory = (categoryName) => {
+    setEditingAssetCategory(categoryName);
+    setEditAssetCategoryValue(categoryName);
+  };
+
+  const cancelEditAssetCategory = () => {
+    setEditingAssetCategory(null);
+    setEditAssetCategoryValue('');
   };
 
   return (
@@ -296,7 +402,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
           </div>
           <div className="form-group">
             <p className="helper-text" style={{ marginBottom: '1rem' }}>
-              Manage categories for organizing your stock items. Default categories cannot be deleted.
+              Manage categories for organizing your stock items.
             </p>
 
             <div className="category-list">
@@ -323,33 +429,24 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
                     </div>
                   ) : (
                     <>
-                      <span className="category-name">
-                        {category}
-                        {DEFAULT_CATEGORIES.includes(category) && (
-                          <span className="default-badge">Default</span>
-                        )}
-                      </span>
+                      <span className="category-name">{category}</span>
                       <div className="category-actions">
-                        {!DEFAULT_CATEGORIES.includes(category) && (
-                          <>
-                            <button
-                              className="icon-btn"
-                              onClick={() => startEditCategory(category)}
-                              title="Edit"
-                              disabled={isLoading}
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              className="icon-btn danger"
-                              onClick={() => handleDeleteCategory(category)}
-                              title="Delete"
-                              disabled={isLoading}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
+                        <button
+                          className="icon-btn"
+                          onClick={() => startEditCategory(category)}
+                          title="Edit"
+                          disabled={isLoading}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          className="icon-btn danger"
+                          onClick={() => handleDeleteCategory(category)}
+                          title="Delete"
+                          disabled={isLoading}
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </>
                   )}
@@ -370,6 +467,85 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
                 className="btn btn-primary"
                 onClick={handleAddCategory}
                 disabled={isLoading || !newCategory.trim()}
+              >
+                <Plus size={16} /> Add Category
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="section-header">
+            <Truck size={24} />
+            <h3>Asset Categories</h3>
+          </div>
+          <div className="form-group">
+            <p className="helper-text" style={{ marginBottom: '1rem' }}>
+              Manage categories for organizing your assets (vehicles, equipment, etc.).
+            </p>
+
+            <div className="category-list">
+              {assetCategories && assetCategories.map(category => (
+                <div key={category} className="category-item">
+                  {editingAssetCategory === category ? (
+                    <div className="category-edit">
+                      <input
+                        type="text"
+                        value={editAssetCategoryValue}
+                        onChange={(e) => setEditAssetCategoryValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleEditAssetCategory(category);
+                          if (e.key === 'Escape') cancelEditAssetCategory();
+                        }}
+                        autoFocus
+                      />
+                      <button className="icon-btn success" onClick={() => handleEditAssetCategory(category)} title="Save">
+                        <Check size={16} />
+                      </button>
+                      <button className="icon-btn" onClick={cancelEditAssetCategory} title="Cancel">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="category-name">{category}</span>
+                      <div className="category-actions">
+                        <button
+                          className="icon-btn"
+                          onClick={() => startEditAssetCategory(category)}
+                          title="Edit"
+                          disabled={isLoading}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          className="icon-btn danger"
+                          onClick={() => handleDeleteAssetCategory(category)}
+                          title="Delete"
+                          disabled={isLoading}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="add-category-form">
+              <input
+                type="text"
+                placeholder="New asset category name..."
+                value={newAssetCategory}
+                onChange={(e) => setNewAssetCategory(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddAssetCategory()}
+                disabled={isLoading}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleAddAssetCategory}
+                disabled={isLoading || !newAssetCategory.trim()}
               >
                 <Plus size={16} /> Add Category
               </button>
@@ -440,7 +616,7 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
             <h3>About</h3>
           </div>
           <div className="about-info">
-            <h4>OneShot Workshop Manager v2.1</h4>
+            <h4>OneShot Workshop Manager v2.2</h4>
             <p>
               A comprehensive web application for managing workshop expenses, stock inventory, and asset maintenance tracking for OneShot Workshop.
             </p>
@@ -450,12 +626,14 @@ function Settings({ currency, setCurrency, inventoryMethod, setInventoryMethod, 
             <ul>
               <li>Stock management with batch tracking and multiple costing methods</li>
               <li>FIFO and Weighted Average inventory valuation</li>
+              <li>Stock write-off system</li>
+              <li>Customizable stock and asset categories</li>
               <li>Job card creation and management</li>
-              <li>Asset expense tracking for vehicles, trailers, and implements</li>
+              <li>Asset expense tracking</li>
               <li>Supplier management</li>
               <li>Comprehensive reporting and analytics</li>
               <li>Multi-currency support</li>
-              <li>Cloud-based data storage with Supabase</li>
+              <li>Cloud-based data storage with Firebase</li>
               <li>Secure user authentication</li>
               <li>Data export and backup capabilities</li>
             </ul>

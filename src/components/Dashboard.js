@@ -17,6 +17,7 @@ function Dashboard({
   currency, setCurrency,
   inventoryMethod, setInventoryMethod,
   categories, setCategories,
+  assetCategories, setAssetCategories,
   currentUser,
   onLogout,
   refreshData,
@@ -76,6 +77,7 @@ function Dashboard({
               deleteAsset={deleteAsset}
               jobCards={jobCards}
               currency={currency}
+              assetCategories={assetCategories}
             />
           } />
           <Route path="/suppliers" element={
@@ -104,7 +106,10 @@ function Dashboard({
               setInventoryMethod={setInventoryMethod}
               categories={categories}
               setCategories={setCategories}
+              assetCategories={assetCategories}
+              setAssetCategories={setAssetCategories}
               stock={stock}
+              assets={assets}
               currentUser={currentUser}
             />
           } />
