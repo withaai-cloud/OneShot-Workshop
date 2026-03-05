@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix: Stock invoice save now creates batch records in Firebase\n\n- Added api import and currentUser prop to Stock.js\n- Updated handleInvoiceSave to async function with proper Firebase batch creation\n- Uses api.addStockBatch\\(\\) to create records in stock_batches collection\n- Calculates weighted average for existing stock updates\n- Added currentUser prop pass-through in Dashboard.js\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
     ]
   }
 }

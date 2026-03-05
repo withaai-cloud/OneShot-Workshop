@@ -26,6 +26,7 @@ function App() {
   const [inventoryMethod, setInventoryMethod] = useState('FIFO');
   const [categories, setCategories] = useState(['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
   const [assetCategories, setAssetCategories] = useState(['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other']);
+  const [specificationCategories, setSpecificationCategories] = useState([]);
 
   // Sync with Firebase in background (doesn't block UI)
   const syncInBackground = useCallback(async (userId) => {
@@ -42,6 +43,7 @@ function App() {
       setInventoryMethod(data.settings?.inventoryMethod || 'FIFO');
       setCategories(data.settings?.categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
       setAssetCategories(data.settings?.assetCategories || ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other']);
+      setSpecificationCategories(data.settings?.specificationCategories || []);
 
       // Update cache
       cache.setCachedData(userId, data);
@@ -68,6 +70,7 @@ function App() {
         setInventoryMethod(cachedData.settings?.inventoryMethod || 'FIFO');
         setCategories(cachedData.settings?.categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
         setAssetCategories(cachedData.settings?.assetCategories || ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other']);
+        setSpecificationCategories(cachedData.settings?.specificationCategories || []);
         setLoadedFromCache(true);
         
         // Sync in background (don't block UI)
@@ -94,6 +97,7 @@ function App() {
       setInventoryMethod(data.settings?.inventoryMethod || 'FIFO');
       setCategories(data.settings?.categories || ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
       setAssetCategories(data.settings?.assetCategories || ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other']);
+      setSpecificationCategories(data.settings?.specificationCategories || []);
 
       // Save to cache
       cache.setCachedData(userId, data);
@@ -127,6 +131,7 @@ function App() {
           setInventoryMethod('FIFO');
           setCategories(['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other']);
           setAssetCategories(['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other']);
+          setSpecificationCategories([]);
           cache.clearCache();
         }
         
@@ -351,6 +356,17 @@ function App() {
     }
   };
 
+  const handleSetSpecificationCategories = async (newSpecCategories) => {
+    try {
+      await api.updateSettings(currentUser.uid, { currency, inventoryMethod, categories, assetCategories, specificationCategories: newSpecCategories });
+      setSpecificationCategories(newSpecCategories);
+      cache.invalidateCache();
+    } catch (err) {
+      console.error('Error updating specification categories:', err);
+      throw err;
+    }
+  };
+
   // Refresh data function (for manual refresh)
   const refreshData = async () => {
     if (currentUser) {
@@ -433,6 +449,8 @@ function App() {
                 setCategories={handleSetCategories}
                 assetCategories={assetCategories}
                 setAssetCategories={handleSetAssetCategories}
+                specificationCategories={specificationCategories}
+                setSpecificationCategories={handleSetSpecificationCategories}
                 currentUser={currentUser}
                 onLogout={handleLogout}
                 refreshData={refreshData}

@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Truck, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Truck, Search, FileText, X, Check } from 'lucide-react';
 
 const DEFAULT_ASSET_CATEGORIES = ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other'];
 
-function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency, assetCategories = DEFAULT_ASSET_CATEGORIES }) {
+function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency, assetCategories = DEFAULT_ASSET_CATEGORIES, specificationCategories = [] }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewingSpecsAsset, setViewingSpecsAsset] = useState(null);
+
+  // Spec entry state (used inside the add/edit modal)
+  const [newSpecCategory, setNewSpecCategory] = useState('');
+  const [newSpecValue, setNewSpecValue] = useState('');
+  const [editingSpecIndex, setEditingSpecIndex] = useState(null);
+  const [editSpecValue, setEditSpecValue] = useState('');
+
   const [formData, setFormData] = useState({
     name: '',
     type: assetCategories[0] || 'Vehicle',
@@ -14,7 +22,8 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
     make: '',
     model: '',
     year: '',
-    description: ''
+    description: '',
+    specifications: []
   });
 
   const getCurrencySymbol = () => {
@@ -46,15 +55,60 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
       make: '',
       model: '',
       year: '',
-      description: ''
+      description: '',
+      specifications: []
     });
+    setEditingSpecIndex(null);
+    setEditSpecValue('');
+    setNewSpecCategory('');
+    setNewSpecValue('');
     setIsAdding(false);
   };
 
   const handleEdit = (asset) => {
-    setFormData(asset);
+    setFormData({ ...asset, specifications: asset.specifications || [] });
     setEditingId(asset.id);
+    setEditingSpecIndex(null);
+    setEditSpecValue('');
+    setNewSpecCategory('');
+    setNewSpecValue('');
     setIsAdding(true);
+    setViewingSpecsAsset(null);
+  };
+
+  const handleAddSpec = () => {
+    if (!newSpecCategory || !newSpecValue.trim()) return;
+    setFormData(prev => ({
+      ...prev,
+      specifications: [...prev.specifications, { category: newSpecCategory, value: newSpecValue.trim() }]
+    }));
+    setNewSpecValue('');
+  };
+
+  const handleDeleteSpec = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: prev.specifications.filter((_, i) => i !== index)
+    }));
+    if (editingSpecIndex === index) {
+      setEditingSpecIndex(null);
+      setEditSpecValue('');
+    }
+  };
+
+  const handleStartEditSpec = (index) => {
+    setEditingSpecIndex(index);
+    setEditSpecValue(formData.specifications[index].value);
+  };
+
+  const handleSaveSpec = (index) => {
+    if (!editSpecValue.trim()) return;
+    setFormData(prev => ({
+      ...prev,
+      specifications: prev.specifications.map((s, i) => i === index ? { ...s, value: editSpecValue.trim() } : s)
+    }));
+    setEditingSpecIndex(null);
+    setEditSpecValue('');
   };
 
   const handleDelete = (id) => {
@@ -207,6 +261,83 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
                   />
                 </div>
               </div>
+
+              {/* Specification Sheet */}
+              <div style={{ borderTop: '2px solid #e5e7eb', marginTop: '1rem', paddingTop: '1rem' }}>
+                <h4 style={{ marginBottom: '0.75rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileText size={18} /> Specification Sheet
+                </h4>
+
+                {formData.specifications.length > 0 && (
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    {formData.specifications.map((spec, index) => (
+                      <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid #f3f4f6' }}>
+                        <span style={{ fontWeight: 600, minWidth: '140px', color: '#374151', fontSize: '0.875rem' }}>{spec.category}:</span>
+                        {editingSpecIndex === index ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editSpecValue}
+                              onChange={(e) => setEditSpecValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveSpec(index);
+                                if (e.key === 'Escape') { setEditingSpecIndex(null); setEditSpecValue(''); }
+                              }}
+                              autoFocus
+                              style={{ flex: 1 }}
+                            />
+                            <button className="icon-btn success" onClick={() => handleSaveSpec(index)} title="Save"><Check size={14} /></button>
+                            <button className="icon-btn" onClick={() => { setEditingSpecIndex(null); setEditSpecValue(''); }} title="Cancel"><X size={14} /></button>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ flex: 1, color: '#6b7280', fontSize: '0.875rem' }}>{spec.value}</span>
+                            <button className="icon-btn" onClick={() => handleStartEditSpec(index)} title="Edit"><Edit2 size={14} /></button>
+                            <button className="icon-btn danger" onClick={() => handleDeleteSpec(index)} title="Delete"><Trash2 size={14} /></button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {specificationCategories.length > 0 ? (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select
+                      value={newSpecCategory}
+                      onChange={(e) => setNewSpecCategory(e.target.value)}
+                      style={{ flex: '0 0 auto', minWidth: '150px' }}
+                    >
+                      <option value="">Select category...</option>
+                      {specificationCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Enter value..."
+                      value={newSpecValue}
+                      onChange={(e) => setNewSpecValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddSpec()}
+                      style={{ flex: 1, minWidth: '120px' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleAddSpec}
+                      disabled={!newSpecCategory || !newSpecValue.trim()}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      <Plus size={14} /> Add Spec
+                    </button>
+                  </div>
+                ) : (
+                  <p style={{ color: '#9ca3af', fontSize: '0.875rem', fontStyle: 'italic' }}>
+                    No specification categories configured. Add them in Settings first.
+                  </p>
+                )}
+              </div>
+
               <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={resetForm}>
                   Cancel
@@ -272,6 +403,25 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
                   </div>
                 </div>
                 <div className="list-item-actions">
+                  <button
+                    className="icon-btn"
+                    onClick={() => setViewingSpecsAsset(asset)}
+                    title={`View Specs${asset.specifications && asset.specifications.length > 0 ? ` (${asset.specifications.length})` : ''}`}
+                    style={{ position: 'relative' }}
+                  >
+                    <FileText size={16} />
+                    {asset.specifications && asset.specifications.length > 0 && (
+                      <span style={{
+                        position: 'absolute', top: '-4px', right: '-4px',
+                        background: '#3b82f6', color: 'white', borderRadius: '50%',
+                        width: '14px', height: '14px', fontSize: '9px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 700
+                      }}>
+                        {asset.specifications.length}
+                      </span>
+                    )}
+                  </button>
                   <button className="icon-btn" onClick={() => handleEdit(asset)} title="Edit">
                     <Edit2 size={16} />
                   </button>
@@ -284,6 +434,46 @@ function Assets({ assets, addAsset, updateAsset, deleteAsset, jobCards, currency
           })
         )}
       </div>
+
+      {/* View Specs Modal */}
+      {viewingSpecsAsset && (
+        <div className="modal-overlay" onClick={() => setViewingSpecsAsset(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileText size={20} /> {viewingSpecsAsset.name} — Specifications
+              </h3>
+              <button className="close-btn" onClick={() => setViewingSpecsAsset(null)}>×</button>
+            </div>
+            <div style={{ padding: '1rem 0' }}>
+              {viewingSpecsAsset.specifications && viewingSpecsAsset.specifications.length > 0 ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    {viewingSpecsAsset.specifications.map((spec, index) => (
+                      <tr key={index} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: '#374151', width: '45%' }}>{spec.category}</td>
+                        <td style={{ padding: '0.6rem 0.5rem', color: '#6b7280' }}>{spec.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p style={{ color: '#9ca3af', fontStyle: 'italic', textAlign: 'center', padding: '1rem 0' }}>
+                  No specifications added yet.
+                </p>
+              )}
+            </div>
+            <div className="form-actions">
+              <button className="btn btn-secondary" onClick={() => setViewingSpecsAsset(null)}>
+                Close
+              </button>
+              <button className="btn btn-primary" onClick={() => handleEdit(viewingSpecsAsset)}>
+                Edit Specifications
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

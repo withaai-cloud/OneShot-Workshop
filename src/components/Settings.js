@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe, Info, Package, Loader, Tag, Plus, Edit2, Trash2, X, Check, Truck } from 'lucide-react';
+import { Globe, Info, Package, Loader, Tag, Plus, Edit2, Trash2, X, Check, Truck, ClipboardList } from 'lucide-react';
 import * as api from '../lib/firebaseApi';
 
 function Settings({
@@ -7,6 +7,7 @@ function Settings({
   inventoryMethod, setInventoryMethod,
   categories, setCategories,
   assetCategories, setAssetCategories,
+  specificationCategories, setSpecificationCategories,
   stock, assets, currentUser
 }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +23,11 @@ function Settings({
   const [newAssetCategory, setNewAssetCategory] = useState('');
   const [editingAssetCategory, setEditingAssetCategory] = useState(null);
   const [editAssetCategoryValue, setEditAssetCategoryValue] = useState('');
+
+  // Specification category state
+  const [newSpecCategory, setNewSpecCategory] = useState('');
+  const [editingSpecCategory, setEditingSpecCategory] = useState(null);
+  const [editSpecCategoryValue, setEditSpecCategoryValue] = useState('');
 
   const currencies = [
     { code: 'ZAR', name: 'South African Rand (R)', symbol: 'R' },
@@ -311,6 +317,93 @@ function Settings({
     setEditAssetCategoryValue('');
   };
 
+  // ==================== SPECIFICATION CATEGORY HANDLERS ====================
+  const handleAddSpecCategory = async () => {
+    const trimmed = newSpecCategory.trim();
+    if (!trimmed) {
+      setError('Please enter a specification category name');
+      return;
+    }
+    if (specificationCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This specification category already exists');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const updated = [...specificationCategories, trimmed];
+      await setSpecificationCategories(updated);
+      setNewSpecCategory('');
+      setSuccess('Specification category added successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to add specification category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditSpecCategory = async (oldName) => {
+    const trimmed = editSpecCategoryValue.trim();
+    if (!trimmed) {
+      setError('Please enter a specification category name');
+      return;
+    }
+    if (trimmed !== oldName && specificationCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This specification category already exists');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const updated = specificationCategories.map(c => c === oldName ? trimmed : c);
+      await setSpecificationCategories(updated);
+      setEditingSpecCategory(null);
+      setEditSpecCategoryValue('');
+      setSuccess('Specification category updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to update specification category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSpecCategory = async (categoryName) => {
+    const inUse = assets && assets.some(asset =>
+      asset.specifications && asset.specifications.some(s => s.category === categoryName)
+    );
+    if (inUse) {
+      setError(`Cannot delete "${categoryName}" - it is used by one or more assets`);
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete the specification category "${categoryName}"?`)) {
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const updated = specificationCategories.filter(c => c !== categoryName);
+      await setSpecificationCategories(updated);
+      setSuccess('Specification category deleted successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to delete specification category. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startEditSpecCategory = (categoryName) => {
+    setEditingSpecCategory(categoryName);
+    setEditSpecCategoryValue(categoryName);
+  };
+
+  const cancelEditSpecCategory = () => {
+    setEditingSpecCategory(null);
+    setEditSpecCategoryValue('');
+  };
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -548,6 +641,89 @@ function Settings({
                 className="btn btn-primary"
                 onClick={handleAddAssetCategory}
                 disabled={isLoading || !newAssetCategory.trim()}
+              >
+                <Plus size={16} /> Add Category
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="section-header">
+            <ClipboardList size={24} />
+            <h3>Asset Specification Categories</h3>
+          </div>
+          <div className="form-group">
+            <p className="helper-text" style={{ marginBottom: '1rem' }}>
+              Manage specification types that can be attached to assets (e.g., Tyre Size, Axle Size, VIN).
+            </p>
+
+            <div className="category-list">
+              {specificationCategories && specificationCategories.map(category => (
+                <div key={category} className="category-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
+                  {editingSpecCategory === category ? (
+                    <div className="category-edit" style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
+                      <input
+                        type="text"
+                        value={editSpecCategoryValue}
+                        onChange={(e) => setEditSpecCategoryValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleEditSpecCategory(category);
+                          if (e.key === 'Escape') cancelEditSpecCategory();
+                        }}
+                        autoFocus
+                        style={{ flex: 1 }}
+                      />
+                      <button className="icon-btn success" onClick={() => handleEditSpecCategory(category)} title="Save">
+                        <Check size={16} />
+                      </button>
+                      <button className="icon-btn" onClick={cancelEditSpecCategory} title="Cancel">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="category-name">{category}</span>
+                      <div className="category-actions" style={{ display: 'flex', gap: '0.25rem', marginLeft: 'auto' }}>
+                        <button
+                          className="icon-btn"
+                          onClick={() => startEditSpecCategory(category)}
+                          title="Edit"
+                          disabled={isLoading}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          className="icon-btn danger"
+                          onClick={() => handleDeleteSpecCategory(category)}
+                          title="Delete"
+                          disabled={isLoading}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {specificationCategories && specificationCategories.length === 0 && (
+                <p className="helper-text" style={{ fontStyle: 'italic' }}>No specification categories yet.</p>
+              )}
+            </div>
+
+            <div className="add-category-form">
+              <input
+                type="text"
+                placeholder="New specification category (e.g. Tyre Size)..."
+                value={newSpecCategory}
+                onChange={(e) => setNewSpecCategory(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSpecCategory()}
+                disabled={isLoading}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleAddSpecCategory}
+                disabled={isLoading || !newSpecCategory.trim()}
               >
                 <Plus size={16} /> Add Category
               </button>

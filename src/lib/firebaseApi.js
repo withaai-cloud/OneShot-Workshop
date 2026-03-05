@@ -106,6 +106,7 @@ export const updateProfileData = async (userId, updates) => {
 
 const DEFAULT_CATEGORIES = ['Parts', 'Fluids', 'Filters', 'Consumables', 'Tools', 'Other'];
 const DEFAULT_ASSET_CATEGORIES = ['Vehicle', 'Trailer', 'Implement', 'Equipment', 'Other'];
+const DEFAULT_SPECIFICATION_CATEGORIES = [];
 
 export const getSettings = async (userId) => {
   const docRef = doc(db, 'settings', userId);
@@ -117,7 +118,8 @@ export const getSettings = async (userId) => {
       currency: data.currency || 'ZAR',
       inventoryMethod: data.inventory_method || 'FIFO',
       categories: data.categories || DEFAULT_CATEGORIES,
-      assetCategories: data.asset_categories || DEFAULT_ASSET_CATEGORIES
+      assetCategories: data.asset_categories || DEFAULT_ASSET_CATEGORIES,
+      specificationCategories: data.specification_categories || DEFAULT_SPECIFICATION_CATEGORIES
     };
   }
   // Return defaults if not found
@@ -125,7 +127,8 @@ export const getSettings = async (userId) => {
     currency: 'ZAR',
     inventoryMethod: 'FIFO',
     categories: DEFAULT_CATEGORIES,
-    assetCategories: DEFAULT_ASSET_CATEGORIES
+    assetCategories: DEFAULT_ASSET_CATEGORIES,
+    specificationCategories: DEFAULT_SPECIFICATION_CATEGORIES
   };
 };
 
@@ -138,6 +141,10 @@ export const updateSettings = async (userId, updates) => {
     categories: updates.categories || DEFAULT_CATEGORIES,
     asset_categories: updates.assetCategories || DEFAULT_ASSET_CATEGORIES
   };
+  // Only update specification_categories if explicitly provided
+  if (updates.specificationCategories !== undefined) {
+    dbUpdates.specification_categories = updates.specificationCategories;
+  }
   await setDoc(docRef, dbUpdates, { merge: true });
 
   // Return transformed data (camelCase)
@@ -145,7 +152,8 @@ export const updateSettings = async (userId, updates) => {
     currency: updates.currency,
     inventoryMethod: updates.inventoryMethod,
     categories: updates.categories || DEFAULT_CATEGORIES,
-    assetCategories: updates.assetCategories || DEFAULT_ASSET_CATEGORIES
+    assetCategories: updates.assetCategories || DEFAULT_ASSET_CATEGORIES,
+    specificationCategories: updates.specificationCategories || DEFAULT_SPECIFICATION_CATEGORIES
   };
 };
 
@@ -510,7 +518,8 @@ export const fetchAssets = async (userId) => {
       make: data.make,
       model: data.model,
       year: data.year,
-      description: data.description
+      description: data.description,
+      specifications: data.specifications || []
     };
   });
 };
@@ -526,6 +535,7 @@ export const createAsset = async (assetData, userId) => {
     model: assetData.model || '',
     year: assetData.year || '',
     description: assetData.description || '',
+    specifications: assetData.specifications || [],
     created_at: new Date().toISOString()
   };
   await setDoc(docRef, data);
@@ -538,7 +548,8 @@ export const createAsset = async (assetData, userId) => {
     make: data.make,
     model: data.model,
     year: data.year,
-    description: data.description
+    description: data.description,
+    specifications: data.specifications
   };
 };
 
@@ -551,7 +562,8 @@ export const updateAsset = async (assetId, updates) => {
     make: updates.make,
     model: updates.model,
     year: updates.year,
-    description: updates.description
+    description: updates.description,
+    specifications: updates.specifications || []
   };
   await updateDoc(docRef, dbUpdates);
 
@@ -564,7 +576,8 @@ export const updateAsset = async (assetId, updates) => {
     make: updates.make,
     model: updates.model,
     year: updates.year,
-    description: updates.description
+    description: updates.description,
+    specifications: updates.specifications || []
   };
 };
 

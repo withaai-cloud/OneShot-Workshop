@@ -18,6 +18,7 @@ function Dashboard({
   inventoryMethod, setInventoryMethod,
   categories, setCategories,
   assetCategories, setAssetCategories,
+  specificationCategories, setSpecificationCategories,
   currentUser,
   onLogout,
   refreshData,
@@ -78,6 +79,7 @@ function Dashboard({
               jobCards={jobCards}
               currency={currency}
               assetCategories={assetCategories}
+              specificationCategories={specificationCategories}
             />
           } />
           <Route path="/suppliers" element={
@@ -108,6 +110,8 @@ function Dashboard({
               setCategories={setCategories}
               assetCategories={assetCategories}
               setAssetCategories={setAssetCategories}
+              specificationCategories={specificationCategories}
+              setSpecificationCategories={setSpecificationCategories}
               stock={stock}
               assets={assets}
               currentUser={currentUser}
